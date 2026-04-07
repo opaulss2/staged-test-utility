@@ -13,23 +13,32 @@ _BORDER_SELECTED = "#F78923"  # orange  – current stage, ready to execute
 _BORDER_UPCOMING = "#F7F323"  # yellow  – future stages
 _BORDER_EXECUTED = "#91F723"  # green   – completed stages
 _BORDER_WIDTH = 3
+_WHEEL_SIZE = 220
+_WHEEL_ARC_WIDTH = 18
 
 
 class MainWindow:
     def __init__(self, root: tk.Tk) -> None:
         self.root = root
         self.root.title("TPMS Test Utility")
-        self.root.geometry("1920x720")
+        self.root.geometry("1280x576")
 
         self._load_sun_valley_theme()
 
         self.status_var = tk.StringVar(value="Ready")
         self.timer_var = tk.StringVar(value="Remaining: 00:00")
         self.current_stage_var = tk.StringVar(value="Current stage: 0")
+        self.timer_stage_var = tk.StringVar(value="Timed stage idle")
 
         self.log_text = tk.Text(self.root, height=14, state="disabled")
         self.stage_buttons: dict[int, ttk.Button] = {}
         self.stage_frames: dict[int, tk.Frame] = {}
+        self.timer_canvas: tk.Canvas | None = None
+        self.timer_wheel_arc: int | None = None
+        self.timer_wheel_angle = 0
+        self.timer_wheel_job: str | None = None
+        self.timer_running = False
+        self.pending_timer_seconds: int | None = 0
 
         self.controller = CycleController(
             stages=[],
@@ -44,6 +53,7 @@ class MainWindow:
         self._build_layout()
         self._refresh_stage_buttons()
         self._run_startup_self_checks()
+        self._process_pending_timer_update()
 
         self.root.bind("<space>", self._on_space)
         self.root.protocol("WM_DELETE_WINDOW", self._on_close)
@@ -55,7 +65,10 @@ class MainWindow:
                 "Sun Valley theme is required but missing at vendor/sun-valley-ttk-theme/sv_ttk/sv.tcl"
             )
         self.root.tk.call("source", str(theme_file))
-        self.root.tk.call("ttk::style", "theme", "use", "sun-valley-light")
+        self.root.tk.call("ttk::style", "theme", "use", "sun-valley-dark")
+        style = ttk.Style()
+        current_font = style.lookup("TButton", "font") or "TkDefaultFont"
+        style.configure("TButton", font=(current_font, 10, "bold"))
         self.root.event_generate("<<ThemeChanged>>")
 
     def _build_layout(self) -> None:
@@ -69,16 +82,18 @@ class MainWindow:
         stage_frame.grid(row=0, column=0, sticky="nsew", padx=12, pady=12)
         stage_frame.rowconfigure(0, weight=1)
 
+        _btn_outer = 115 + 2 * _BORDER_WIDTH
         for idx in range(len(self.controller.stages)):
             stage_frame.columnconfigure(idx, weight=1, uniform="stage")
             stage = self.controller.stages[idx]
             label = self._format_stage_label(stage.stage_id, stage.name)
-            border = tk.Frame(stage_frame, bg=_BORDER_UPCOMING)
-            border.grid(row=0, column=idx, sticky="nsew", padx=8, pady=8)
+            border = tk.Frame(stage_frame, bg=_BORDER_UPCOMING, width=_btn_outer, height=_btn_outer)
+            border.grid(row=0, column=idx, padx=8, pady=8)
+            border.grid_propagate(False)
             border.rowconfigure(0, weight=1)
             border.columnconfigure(0, weight=1)
             button = ttk.Button(border, text=label, command=lambda i=idx: self._select_stage(i))
-            button.grid(row=0, column=0, sticky="nsew", padx=_BORDER_WIDTH, pady=_BORDER_WIDTH, ipadx=12, ipady=28)
+            button.grid(row=0, column=0, sticky="nsew", padx=_BORDER_WIDTH, pady=_BORDER_WIDTH)
             self.stage_frames[idx] = border
             self.stage_buttons[idx] = button
 
@@ -86,18 +101,63 @@ class MainWindow:
         details_frame.grid(row=0, column=1, sticky="nsew", padx=(0, 12), pady=12)
         details_frame.columnconfigure(0, weight=1)
 
-        ttk.Label(details_frame, textvariable=self.current_stage_var).grid(row=0, column=0, sticky="w", padx=8, pady=(8, 4))
-        ttk.Label(details_frame, textvariable=self.status_var).grid(row=1, column=0, sticky="w", padx=8, pady=4)
-        ttk.Label(details_frame, textvariable=self.timer_var).grid(row=2, column=0, sticky="w", padx=8, pady=(4, 8))
+        lbl_stage = ttk.Label(details_frame, textvariable=self.current_stage_var, wraplength=1, justify="left")
+        lbl_stage.grid(row=0, column=0, sticky="ew", padx=8, pady=(8, 4))
+        lbl_status = ttk.Label(details_frame, textvariable=self.status_var, wraplength=1, justify="left")
+        lbl_status.grid(row=1, column=0, sticky="ew", padx=8, pady=4)
+        lbl_timer = ttk.Label(details_frame, textvariable=self.timer_var, wraplength=1, justify="left")
+        lbl_timer.grid(row=2, column=0, sticky="ew", padx=8, pady=(4, 8))
+        lbl_timer_stage = ttk.Label(details_frame, textvariable=self.timer_stage_var, wraplength=1, justify="left")
+        lbl_timer_stage.grid(row=3, column=0, sticky="ew", padx=8, pady=(0, 8))
+
+        _status_labels = [lbl_stage, lbl_status, lbl_timer, lbl_timer_stage]
+
+        def _on_details_resize(event: tk.Event) -> None:
+            wrap = max(event.width - 16, 1)
+            for lbl in _status_labels:
+                lbl.configure(wraplength=wrap)
+
+        details_frame.bind("<Configure>", _on_details_resize)
+
+        self.timer_canvas = tk.Canvas(
+            details_frame,
+            width=_WHEEL_SIZE,
+            height=_WHEEL_SIZE,
+            highlightthickness=0,
+            bd=0,
+            background=self.root.cget("bg"),
+        )
+        self.timer_canvas.grid(row=4, column=0, pady=(0, 12))
+        self.timer_canvas.grid_remove()
+        inset = _WHEEL_ARC_WIDTH
+        self.timer_canvas.create_oval(
+            inset,
+            inset,
+            _WHEEL_SIZE - inset,
+            _WHEEL_SIZE - inset,
+            outline="#D9D9D9",
+            width=6,
+        )
+        self.timer_wheel_arc = self.timer_canvas.create_arc(
+            inset,
+            inset,
+            _WHEEL_SIZE - inset,
+            _WHEEL_SIZE - inset,
+            start=self.timer_wheel_angle,
+            extent=90,
+            style="arc",
+            outline=_BORDER_SELECTED,
+            width=_WHEEL_ARC_WIDTH,
+        )
 
         instructions = (
             "Press SPACE to execute current stage and advance.\n"
             "Stage 2 is manual and only advances.\n"
             "Stage 6 will fail if stage 5 timer has not finished."
         )
-        ttk.Label(details_frame, text=instructions, justify="left", wraplength=300).grid(
-            row=3, column=0, sticky="nw", padx=8, pady=4
-        )
+        lbl_instructions = ttk.Label(details_frame, text=instructions, justify="left", wraplength=1)
+        lbl_instructions.grid(row=5, column=0, sticky="nw", padx=8, pady=4)
+        _status_labels.append(lbl_instructions)
 
         log_frame = ttk.LabelFrame(self.root, text="Execution log")
         log_frame.grid(row=1, column=0, columnspan=2, sticky="nsew", padx=12, pady=(0, 12))
@@ -158,9 +218,49 @@ class MainWindow:
         return f"Stage {stage_id}\n{wrapped_name}"
 
     def _set_timer(self, remaining_seconds: int) -> None:
+        self.pending_timer_seconds = remaining_seconds
+
+    def _process_pending_timer_update(self) -> None:
+        if self.pending_timer_seconds is not None:
+            self._apply_timer_update(self.pending_timer_seconds)
+            self.pending_timer_seconds = None
+        self.root.after(100, self._process_pending_timer_update)
+
+    def _apply_timer_update(self, remaining_seconds: int) -> None:
         minutes, seconds = divmod(remaining_seconds, 60)
         self.timer_var.set(f"Remaining: {minutes:02d}:{seconds:02d}")
+        if remaining_seconds > 0:
+            self._show_timer_wheel()
+        else:
+            self._hide_timer_wheel()
+
+    def _show_timer_wheel(self) -> None:
+        if self.timer_canvas is None:
+            return
+        self.timer_stage_var.set("Timed stage running")
+        self.timer_running = True
+        self.timer_canvas.grid()
+        if self.timer_wheel_job is None:
+            self._animate_timer_wheel()
+
+    def _hide_timer_wheel(self) -> None:
+        self.timer_stage_var.set("Timed stage idle")
+        self.timer_running = False
+        if self.timer_canvas is not None:
+            self.timer_canvas.grid_remove()
+        if self.timer_wheel_job is not None:
+            self.root.after_cancel(self.timer_wheel_job)
+            self.timer_wheel_job = None
+
+    def _animate_timer_wheel(self) -> None:
+        if not self.timer_running or self.timer_canvas is None or self.timer_wheel_arc is None:
+            self.timer_wheel_job = None
+            return
+        self.timer_wheel_angle = (self.timer_wheel_angle + 12) % 360
+        self.timer_canvas.itemconfigure(self.timer_wheel_arc, start=self.timer_wheel_angle)
+        self.timer_wheel_job = self.root.after(50, self._animate_timer_wheel)
 
     def _on_close(self) -> None:
+        self._hide_timer_wheel()
         self.controller.stop()
         self.root.destroy()
