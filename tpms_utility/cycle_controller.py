@@ -67,9 +67,18 @@ class CycleController:
 
     def advance_by_space(self) -> None:
         stage = self.current_stage
+        stage_index = self.current_index
         self.on_log(f"Space pressed on stage {stage.stage_id}: {stage.name}")
-        if stage.action:
-            stage.action(self.runtime_context())
+        try:
+            if stage.action:
+                stage.action(self.runtime_context())
+        except Exception:
+            self.current_index = stage_index
+            self.on_state_changed()
+            self.on_log(
+                f"Stage {stage.stage_id} halted. Press SPACE again to re-run stage {stage.stage_id} from start."
+            )
+            raise
         self.current_index += 1
         if self.current_index >= len(self.stages):
             self.current_index = 0
@@ -99,21 +108,27 @@ class CycleController:
             "1D12 2E20EB20000001200000022000000320000004",
         ]
         results = self.swut.run_batch(commands)
-        for result in results:
-            self.on_log(f"SWUT command: {result.command} -> {result.details}")
+        self._log_swut_test_results(results)
         failures = [result for result in results if not result.success]
         if failures:
+            self.on_log("❌ Stage 1 halted: SWUT test failure detected; stage will not advance")
             raise RuntimeError(f"Stage 1 failed: {failures[0].command} -> {failures[0].details}")
 
     def stage3_enter_debug(self, _: CycleRuntime) -> None:
         self._restart_tawm_in_hpa()
         commands = ["1D12 2705", "1D12 3101DF04"]
         results = self.swut.run_batch(commands)
-        for result in results:
-            self.on_log(f"SWUT command: {result.command} -> {result.details}")
+        self._log_swut_test_results(results)
         failures = [result for result in results if not result.success]
         if failures:
+            self.on_log("❌ Stage 3 halted: SWUT test failure detected; stage will not advance")
             raise RuntimeError(f"Stage 3 failed: {failures[0].command} -> {failures[0].details}")
+
+    def _log_swut_test_results(self, results: list) -> None:
+        for result in results:
+            mark = "✅" if result.success else "❌"
+            verdict = "PASS" if result.success else "FAIL"
+            self.on_log(f"{mark} SWUT test {verdict}: {result.command} -> {result.details}")
 
     def _restart_tawm_in_hpa(self) -> None:
         self.on_log("Restarting Tawm in HPA via SSH hop (SGA -> VCU)")
