@@ -15,6 +15,12 @@ _BORDER_EXECUTED = "#91F723"  # green   – completed stages
 _BORDER_WIDTH = 3
 _WHEEL_SIZE = 220
 _WHEEL_ARC_WIDTH = 18
+_STAGE_FRAME_WIDTH = 860
+_STAGE_FRAME_HEIGHT = 360
+_DETAILS_FRAME_WIDTH = 360
+_DETAILS_FRAME_HEIGHT = 360
+_LOG_FRAME_HEIGHT = 180
+_DETAILS_WRAP = 320
 
 
 class MainWindow:
@@ -66,9 +72,7 @@ class MainWindow:
             )
         self.root.tk.call("source", str(theme_file))
         self.root.tk.call("ttk::style", "theme", "use", "sun-valley-dark")
-        style = ttk.Style()
-        current_font = style.lookup("TButton", "font") or "TkDefaultFont"
-        style.configure("TButton", font=(current_font, 10, "bold"))
+        ttk.Style().configure("TButton", font=("TkDefaultFont", 10, "bold"))
         self.root.event_generate("<<ThemeChanged>>")
 
     def _build_layout(self) -> None:
@@ -78,8 +82,14 @@ class MainWindow:
         self.root.rowconfigure(1, weight=1)
 
         max_stage = max((stage.stage_id for stage in self.controller.stages), default=0)
-        stage_frame = ttk.LabelFrame(self.root, text=f"Stages 0-{max_stage}")
+        stage_frame = ttk.LabelFrame(
+            self.root,
+            text=f"Stages 0-{max_stage}",
+            width=_STAGE_FRAME_WIDTH,
+            height=_STAGE_FRAME_HEIGHT,
+        )
         stage_frame.grid(row=0, column=0, sticky="nsew", padx=12, pady=12)
+        stage_frame.grid_propagate(False)
         stage_frame.rowconfigure(0, weight=1)
 
         _btn_outer = 115 + 2 * _BORDER_WIDTH
@@ -97,27 +107,24 @@ class MainWindow:
             self.stage_frames[idx] = border
             self.stage_buttons[idx] = button
 
-        details_frame = ttk.LabelFrame(self.root, text="Status")
+        details_frame = ttk.LabelFrame(
+            self.root,
+            text="Status",
+            width=_DETAILS_FRAME_WIDTH,
+            height=_DETAILS_FRAME_HEIGHT,
+        )
         details_frame.grid(row=0, column=1, sticky="nsew", padx=(0, 12), pady=12)
+        details_frame.grid_propagate(False)
         details_frame.columnconfigure(0, weight=1)
 
-        lbl_stage = ttk.Label(details_frame, textvariable=self.current_stage_var, wraplength=1, justify="left")
+        lbl_stage = ttk.Label(details_frame, textvariable=self.current_stage_var, wraplength=_DETAILS_WRAP, justify="left")
         lbl_stage.grid(row=0, column=0, sticky="ew", padx=8, pady=(8, 4))
-        lbl_status = ttk.Label(details_frame, textvariable=self.status_var, wraplength=1, justify="left")
+        lbl_status = ttk.Label(details_frame, textvariable=self.status_var, wraplength=_DETAILS_WRAP, justify="left")
         lbl_status.grid(row=1, column=0, sticky="ew", padx=8, pady=4)
-        lbl_timer = ttk.Label(details_frame, textvariable=self.timer_var, wraplength=1, justify="left")
+        lbl_timer = ttk.Label(details_frame, textvariable=self.timer_var, wraplength=_DETAILS_WRAP, justify="left")
         lbl_timer.grid(row=2, column=0, sticky="ew", padx=8, pady=(4, 8))
-        lbl_timer_stage = ttk.Label(details_frame, textvariable=self.timer_stage_var, wraplength=1, justify="left")
+        lbl_timer_stage = ttk.Label(details_frame, textvariable=self.timer_stage_var, wraplength=_DETAILS_WRAP, justify="left")
         lbl_timer_stage.grid(row=3, column=0, sticky="ew", padx=8, pady=(0, 8))
-
-        _status_labels = [lbl_stage, lbl_status, lbl_timer, lbl_timer_stage]
-
-        def _on_details_resize(event: tk.Event) -> None:
-            wrap = max(event.width - 16, 1)
-            for lbl in _status_labels:
-                lbl.configure(wraplength=wrap)
-
-        details_frame.bind("<Configure>", _on_details_resize)
 
         self.timer_canvas = tk.Canvas(
             details_frame,
@@ -155,12 +162,12 @@ class MainWindow:
             "Stage 2 is manual and only advances.\n"
             "Stage 6 will fail if stage 5 timer has not finished."
         )
-        lbl_instructions = ttk.Label(details_frame, text=instructions, justify="left", wraplength=1)
+        lbl_instructions = ttk.Label(details_frame, text=instructions, justify="left", wraplength=_DETAILS_WRAP)
         lbl_instructions.grid(row=5, column=0, sticky="nw", padx=8, pady=4)
-        _status_labels.append(lbl_instructions)
 
-        log_frame = ttk.LabelFrame(self.root, text="Execution log")
+        log_frame = ttk.LabelFrame(self.root, text="Execution log", height=_LOG_FRAME_HEIGHT)
         log_frame.grid(row=1, column=0, columnspan=2, sticky="nsew", padx=12, pady=(0, 12))
+        log_frame.grid_propagate(False)
         log_frame.columnconfigure(0, weight=1)
         log_frame.rowconfigure(0, weight=1)
         self.log_text.grid(in_=log_frame, row=0, column=0, sticky="nsew", padx=8, pady=8)

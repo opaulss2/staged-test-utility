@@ -34,12 +34,15 @@ class SwutService:
             "SWUT_HPA_PIN",
             "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF",
         )
-        self._diag_obj = self._create_diag_object()
+        self._diag_obj = None
+        self._diag_obj_initialised = False
 
-    def _create_diag_object(self):
-        if DiagnosticLibrary is None:
-            return None
-        return DiagnosticLibrary()
+    def _get_diag_object(self):
+        if not self._diag_obj_initialised:
+            self._diag_obj_initialised = True
+            if DiagnosticLibrary is not None:
+                self._diag_obj = DiagnosticLibrary()
+        return self._diag_obj
 
     @staticmethod
     def _normalize_command(command: str) -> str:
@@ -57,7 +60,7 @@ class SwutService:
         return " ".join(hex_string[i : i + 2] for i in range(0, len(hex_string), 2))
 
     def _send_hpa_request(self, request_hex: str, expected: str | None = None, timeout: int | None = None) -> None:
-        if self._diag_obj is None:
+        if self._get_diag_object() is None:
             raise RuntimeError(
                 "SWUT is not installed. Install SWUT from the private repository before running UDS stages."
             )
@@ -70,14 +73,14 @@ class SwutService:
         if timeout is not None:
             kwargs["timeout"] = timeout
 
-        self._diag_obj.send_request(*args, **kwargs)
+        self._get_diag_object().send_request(*args, **kwargs)
 
     def _unlock_security_area(self, area: str) -> None:
-        if self._diag_obj is None:
+        if self._get_diag_object() is None:
             raise RuntimeError(
                 "SWUT is not installed. Install SWUT from the private repository before running UDS stages."
             )
-        self._diag_obj.unlock_security_area(
+        self._get_diag_object().unlock_security_area(
             area,
             "on",
             "HPA",
