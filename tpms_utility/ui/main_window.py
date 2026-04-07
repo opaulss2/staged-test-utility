@@ -9,6 +9,11 @@ from tpms_utility.config import DEFAULT_APP_SETTINGS, DEFAULT_DLT_SETTINGS
 from tpms_utility.cycle_controller import CycleController
 from tpms_utility.stages.default_cycle import build_default_cycle
 
+_BORDER_SELECTED = "#F78923"  # orange  – current stage, ready to execute
+_BORDER_UPCOMING = "#F7F323"  # yellow  – future stages
+_BORDER_EXECUTED = "#91F723"  # green   – completed stages
+_BORDER_WIDTH = 3
+
 
 class MainWindow:
     def __init__(self, root: tk.Tk) -> None:
@@ -24,6 +29,7 @@ class MainWindow:
 
         self.log_text = tk.Text(self.root, height=14, state="disabled")
         self.stage_buttons: dict[int, ttk.Button] = {}
+        self.stage_frames: dict[int, tk.Frame] = {}
 
         self.controller = CycleController(
             stages=[],
@@ -67,8 +73,13 @@ class MainWindow:
             stage_frame.columnconfigure(idx, weight=1, uniform="stage")
             stage = self.controller.stages[idx]
             label = self._format_stage_label(stage.stage_id, stage.name)
-            button = ttk.Button(stage_frame, text=label, command=lambda i=idx: self._select_stage(i))
-            button.grid(row=0, column=idx, sticky="nsew", padx=8, pady=8, ipadx=12, ipady=28)
+            border = tk.Frame(stage_frame, bg=_BORDER_UPCOMING)
+            border.grid(row=0, column=idx, sticky="nsew", padx=8, pady=8)
+            border.rowconfigure(0, weight=1)
+            border.columnconfigure(0, weight=1)
+            button = ttk.Button(border, text=label, command=lambda i=idx: self._select_stage(i))
+            button.grid(row=0, column=0, sticky="nsew", padx=_BORDER_WIDTH, pady=_BORDER_WIDTH, ipadx=12, ipady=28)
+            self.stage_frames[idx] = border
             self.stage_buttons[idx] = button
 
         details_frame = ttk.LabelFrame(self.root, text="Status")
@@ -126,8 +137,13 @@ class MainWindow:
         self.current_stage_var.set(f"Current stage: {stage.stage_id} - {stage.name}")
         for index, button in self.stage_buttons.items():
             if index == self.controller.current_index:
+                self.stage_frames[index].configure(bg=_BORDER_SELECTED)
                 button.state(["pressed"])
+            elif index < self.controller.current_index:
+                self.stage_frames[index].configure(bg=_BORDER_EXECUTED)
+                button.state(["!pressed"])
             else:
+                self.stage_frames[index].configure(bg=_BORDER_UPCOMING)
                 button.state(["!pressed"])
 
     def _append_log(self, message: str) -> None:
