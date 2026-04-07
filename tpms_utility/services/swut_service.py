@@ -28,6 +28,8 @@ class SwutService:
         self.output_dir = output_dir
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.audit_log = self.output_dir / "swut_audit.log"
+        self.hpa_host = os.environ.get("SWUT_HPA_HOST", os.environ.get("TPMS_TARGET_HOST", "169.254.4.10"))
+        os.environ.setdefault("SWUT_HPA_HOST", self.hpa_host)
         self.hpa_pin = os.environ.get(
             "SWUT_HPA_PIN",
             "FFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFFF",

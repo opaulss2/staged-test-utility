@@ -74,6 +74,7 @@ The application reads .env at startup.
 
 Required keys for stage 3 restart flow:
 
+- TPMS_TARGET_HOST
 - TPMS_SGA_HOST
 - TPMS_SGA_USER
 - TPMS_SGA_PASSWORD
@@ -89,6 +90,7 @@ SWUT key:
 
 Behavior:
 
+- TPMS_TARGET_HOST is used by DLT and as the default for TPMS_SGA_HOST.
 - If TPMS_SGA_PASSWORD or TPMS_VCU_PASSWORD is set, stage 3 uses Paramiko password-based SSH.
 - If both passwords are empty, stage 3 falls back to key-based OpenSSH batch mode.
 
