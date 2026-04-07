@@ -51,6 +51,8 @@ Never commit secrets from .env or .venv/pip.ini.
 - Stage 3: must restart Tawm over SSH hop (SGA -> VCU) before running debug command.
 - Stage 4-6: rely on standalone DLT service and parser.
 - Stage 6 export requires stage 5 timer completion.
+- On stage failure, progression must stay on the current stage until retry.
+- SWUT command outcomes should remain visible in Execution log (including SWUT console output).
 
 Do not reorder stages unless explicitly requested by the user.
 

@@ -6,6 +6,7 @@ Desktop Python/Tkinter utility for running the TPMS validation cycle (stages 0-6
 
 - Stage-driven test flow advanced by Space key.
 - SWUT command execution for stage 1 and stage 3 routines.
+- SWUT command results shown as PASS/FAIL with captured SWUT console output in Execution log.
 - Stage 3 Tawm restart over SSH hop (SGA -> VCU) before debug routine.
 - Live DLT capture, timer-based test run, and post-test export.
 - Mandatory Sun Valley ttk theme.
@@ -113,6 +114,8 @@ python .\main.py
 - Stage 4: connect DLT and start logging.
 - Stage 5: clear temp log and start timer.
 - Stage 6: export filtered DLT and ASCII outputs after timer completion.
+
+If a stage fails, progression is halted on that stage. Press Space again to re-run the same stage from the start.
 
 5. Wait for stage 5 timer to complete before stage 6 export.
 
