@@ -19,7 +19,7 @@ _STAGE_FRAME_WIDTH = 860
 _STAGE_FRAME_HEIGHT = 360
 _DETAILS_FRAME_WIDTH = 360
 _DETAILS_FRAME_HEIGHT = 360
-_LOG_FRAME_HEIGHT = 180
+_LOG_FRAME_HEIGHT = 380
 _DETAILS_WRAP = 320
 
 
@@ -27,7 +27,7 @@ class MainWindow:
     def __init__(self, root: tk.Tk) -> None:
         self.root = root
         self.root.title("TPMS Test Utility")
-        self.root.geometry("1280x576")
+        self.root.geometry("1280x776")
 
         self._load_sun_valley_theme()
 
