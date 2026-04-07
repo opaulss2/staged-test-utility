@@ -1,44 +1,145 @@
-# TPMS Test Utility Prototype
+# TPMS Test Utility
 
-Python/Tkinter prototype for TPMS cycle execution with staged scripts, SWUT adapter integration points, and DLT logging workflow.
+Desktop Python/Tkinter utility for running the TPMS validation cycle (stages 0-6), executing SWUT routines, collecting DLT logs, and exporting filtered artifacts.
 
-## Scope covered
+## What this tool does
 
-- Stage model with spacebar-driven progression for stages 0-6.
-- SWUT command stage execution for stages 1 and 3 (safe dry-run audit log in prototype mode).
-- DLT logging lifecycle for stages 4-5 with configurable timer and early-shortening logic based on fault payloads.
-- Log filtering and export for stage 6.
-- Tkinter/ttk desktop UI with optional Sun Valley theme loading.
+- Stage-driven test flow advanced by Space key.
+- SWUT command execution for stage 1 and stage 3 routines.
+- Stage 3 Tawm restart over SSH hop (SGA -> VCU) before debug routine.
+- Live DLT capture, timer-based test run, and post-test export.
+- Mandatory Sun Valley ttk theme.
 
-## Run
+## Prerequisites
 
-1. Create/activate a local Python 3.11+ virtual environment.
-2. Optional: clone Sun Valley theme into `vendor/sun-valley-ttk-theme`.
-3. Start the app:
+1. Windows with Python 3.11+.
+2. Network access to SGA and VCU targets.
+3. Local clone contains vendor/sun-valley-ttk-theme/sv_ttk/sv.tcl.
+4. Access to your internal Artifactory PyPI mirror.
+
+## Setup (step-by-step)
+
+1. Create a virtual environment:
 
 ```powershell
-python main.py
+python -m venv .venv
 ```
 
-## Sun Valley theme
+2. Manually create .venv/pip.ini for your Artifactory mirror.
 
-Theme file expected at:
+Example template (replace placeholders):
 
-- `vendor/sun-valley-ttk-theme/sun-valley.tcl`
+```ini
+[global]
+index-url = https://<ARTIFACTORY_HOST>/artifactory/api/pypi/<PYPI_REPO>/simple
+trusted-host = <ARTIFACTORY_HOST>
 
-If missing, application falls back to default ttk theme.
+[install]
+trusted-host = <ARTIFACTORY_HOST>
+```
 
-## SWUT integration note
+If your mirror requires credentials, use your approved internal method (token, keyring, or URL format required by your organization).
 
-This prototype intentionally avoids calling remote/private package repositories. SWUT calls are represented through a local adapter writing to `output/swut_audit.log`.
+3. Activate the environment:
 
-Once SWUT is manually installed in your environment, replace the adapter internals in `tpms_utility/services/swut_service.py` with real SWUT API calls.
+```powershell
+.\.venv\Scripts\Activate.ps1
+```
 
-## DLT integration note
+4. Install project dependencies:
 
-The current DLT implementation is a local adapter stub that models connection, live payload feed, and file exports. Production integration should replace internals in `tpms_utility/services/dlt_service.py` using DLT Viewer SDK/embedded mechanism approved by your design direction.
+```powershell
+python -m pip install -e .
+```
+
+5. Create local runtime config:
+
+```powershell
+Copy-Item .env.example .env
+```
+
+6. Edit .env with your target credentials and SWUT PIN.
+
+## .env configuration
+
+The application reads .env at startup.
+
+Required keys for stage 3 restart flow:
+
+- TPMS_SGA_HOST
+- TPMS_SGA_USER
+- TPMS_SGA_PASSWORD
+- TPMS_VCU_HOST
+- TPMS_VCU_USER
+- TPMS_VCU_PASSWORD
+- TPMS_TAWM_RESTART_COMMAND
+- TPMS_SSH_TIMEOUT_SECONDS
+
+SWUT key:
+
+- SWUT_HPA_PIN
+
+Behavior:
+
+- If TPMS_SGA_PASSWORD or TPMS_VCU_PASSWORD is set, stage 3 uses Paramiko password-based SSH.
+- If both passwords are empty, stage 3 falls back to key-based OpenSSH batch mode.
+
+## Run the application
+
+```powershell
+python .\main.py
+```
+
+## How to use the tool during a cycle
+
+1. Start the app.
+2. Confirm stage 0 is selected.
+3. Press Space to execute the current stage and advance.
+4. Continue through stages in order:
+- Stage 0: initialize cycle context.
+- Stage 1: overwrite WUIDs via SWUT.
+- Stage 2: manual operation stage.
+- Stage 3: restart Tawm via SSH hop, then enter debug via SWUT.
+- Stage 4: connect DLT and start logging.
+- Stage 5: clear temp log and start timer.
+- Stage 6: export filtered DLT and ASCII outputs after timer completion.
+
+5. Wait for stage 5 timer to complete before stage 6 export.
+
+## Output artifacts
+
+Output root:
+
+- %LOCALAPPDATA%/dTPMSTestUtility
+
+Per run, generated files include:
+
+- <timestamp>_dlt_tmpfile.dlt
+- <timestamp>_test.dlt
+- <timestamp>_Tawm_filtered.dlt
+- <timestamp>_Tawm_LIB_ascii.txt
+
+## Troubleshooting
+
+- pip install fails:
+	verify .venv/pip.ini points to the correct Artifactory index and trusted host.
+- Stage 3 SSH restart fails:
+	verify .env host/user/password values and target reachability.
+- Theme load fails:
+	verify vendor/sun-valley-ttk-theme/sv_ttk/sv.tcl exists.
+- Stage 6 export blocked:
+	stage 5 timer must finish first.
+
+## Notes
+
+- Do not commit secrets in .env or .venv/pip.ini.
+- Keep repository-level docs in sync when stage flow changes.
+
+## AI Agent Onboarding
+
+Future AI coding agents should start with AGENTS.md before making changes.
 
 ## Documentation
 
-- Architecture and sequence diagrams: `docs/ARCHITECTURE.md`
-- Detailed stage behavior and design notes: `docs/IMPLEMENTATION_NOTES.md`
+- docs/ARCHITECTURE.md
+- docs/IMPLEMENTATION_NOTES.md

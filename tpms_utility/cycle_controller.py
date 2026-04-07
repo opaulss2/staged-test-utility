@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from datetime import datetime
+import importlib
 from pathlib import Path
+import subprocess
 import threading
 from typing import Callable
 
@@ -77,6 +79,7 @@ class CycleController:
         if self.runtime is None:
             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
             output_root = self.app_settings.output_root
+            output_root.mkdir(parents=True, exist_ok=True)
             self.runtime = CycleRuntime(
                 cycle_started_at=datetime.now(),
                 run_timestamp=timestamp,
@@ -95,13 +98,113 @@ class CycleController:
             "1D12 2705",
             "1D12 2E20EB20000001200000022000000320000004",
         ]
-        for result in self.swut.run_batch(commands):
+        results = self.swut.run_batch(commands)
+        for result in results:
             self.on_log(f"SWUT command: {result.command} -> {result.details}")
+        failures = [result for result in results if not result.success]
+        if failures:
+            raise RuntimeError(f"Stage 1 failed: {failures[0].command} -> {failures[0].details}")
 
     def stage3_enter_debug(self, _: CycleRuntime) -> None:
+        self._restart_tawm_in_hpa()
         commands = ["1D12 2705", "1D12 3101DF04"]
-        for result in self.swut.run_batch(commands):
+        results = self.swut.run_batch(commands)
+        for result in results:
             self.on_log(f"SWUT command: {result.command} -> {result.details}")
+        failures = [result for result in results if not result.success]
+        if failures:
+            raise RuntimeError(f"Stage 3 failed: {failures[0].command} -> {failures[0].details}")
+
+    def _restart_tawm_in_hpa(self) -> None:
+        self.on_log("Restarting Tawm in HPA via SSH hop (SGA -> VCU)")
+
+        if self.app_settings.sga_password or self.app_settings.vcu_password:
+            self._restart_tawm_with_passwords()
+            self.on_log("Tawm restart command completed and SSH session closed")
+            return
+
+        command = [
+            "ssh",
+            "-o",
+            "BatchMode=yes",
+            "-o",
+            f"ConnectTimeout={self.app_settings.ssh_timeout_seconds}",
+            f"{self.app_settings.sga_user}@{self.app_settings.sga_host}",
+            (
+                "ssh -o BatchMode=yes "
+                f"-o ConnectTimeout={self.app_settings.ssh_timeout_seconds} "
+                f"{self.app_settings.vcu_user}@{self.app_settings.vcu_host} "
+                f"'{self.app_settings.tawm_restart_command}'"
+            ),
+        ]
+        result = subprocess.run(command, capture_output=True, text=True, check=False)
+        if result.returncode != 0:
+            stderr = (result.stderr or "").strip()
+            stdout = (result.stdout or "").strip()
+            detail = stderr or stdout or f"exit code {result.returncode}"
+            raise RuntimeError(f"Stage 3 failed: Tawm restart over SSH failed: {detail}")
+        self.on_log("Tawm restart command completed and SSH session closed")
+
+    def _restart_tawm_with_passwords(self) -> None:
+        try:
+            paramiko = importlib.import_module("paramiko")
+        except ImportError as exc:
+            raise RuntimeError(
+                "Stage 3 failed: password-based SSH restart requires paramiko. "
+                "Install dependencies from pyproject.toml."
+            ) from exc
+
+        sga = paramiko.SSHClient()
+        sga.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+
+        sga_kwargs: dict[str, object] = {
+            "hostname": self.app_settings.sga_host,
+            "username": self.app_settings.sga_user,
+            "timeout": self.app_settings.ssh_timeout_seconds,
+        }
+        if self.app_settings.sga_password:
+            sga_kwargs["password"] = self.app_settings.sga_password
+            sga_kwargs["look_for_keys"] = False
+            sga_kwargs["allow_agent"] = False
+
+        try:
+            sga.connect(**sga_kwargs)
+            transport = sga.get_transport()
+            if transport is None:
+                raise RuntimeError("No SSH transport to SGA")
+
+            jump = transport.open_channel(
+                "direct-tcpip",
+                (self.app_settings.vcu_host, 22),
+                ("127.0.0.1", 0),
+            )
+
+            vcu = paramiko.SSHClient()
+            vcu.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            vcu_kwargs: dict[str, object] = {
+                "hostname": self.app_settings.vcu_host,
+                "username": self.app_settings.vcu_user,
+                "timeout": self.app_settings.ssh_timeout_seconds,
+                "sock": jump,
+            }
+            if self.app_settings.vcu_password:
+                vcu_kwargs["password"] = self.app_settings.vcu_password
+                vcu_kwargs["look_for_keys"] = False
+                vcu_kwargs["allow_agent"] = False
+
+            try:
+                vcu.connect(**vcu_kwargs)
+                _, stdout, stderr = vcu.exec_command(self.app_settings.tawm_restart_command)
+                exit_code = stdout.channel.recv_exit_status()
+                if exit_code != 0:
+                    err = stderr.read().decode("utf-8", errors="ignore").strip()
+                    out = stdout.read().decode("utf-8", errors="ignore").strip()
+                    detail = err or out or f"exit code {exit_code}"
+                    raise RuntimeError(f"Stage 3 failed: Tawm restart over SSH failed: {detail}")
+            finally:
+                vcu.close()
+        finally:
+            sga.close()
 
     def stage4_start_logging(self, runtime: CycleRuntime) -> None:
         self.dlt.connect(self.dlt_settings)

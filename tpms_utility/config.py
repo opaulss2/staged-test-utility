@@ -1,11 +1,32 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import os
 from pathlib import Path
+
+
+def _load_local_env() -> None:
+    env_path = Path(".env")
+    if not env_path.exists():
+        return
+
+    for raw_line in env_path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        key, value = line.split("=", 1)
+        key = key.strip()
+        value = value.strip().strip('"').strip("'")
+        if key and key not in os.environ:
+            os.environ[key] = value
+
+
+_load_local_env()
 
 
 @dataclass(slots=True)
 class DltConnectionSettings:
+    ecu_id: str = "TPMS"
     hostname: str = "169.254.4.10"
     port: int = 3491
     auto_reconnect_timeout_seconds: int = 5
@@ -27,8 +48,20 @@ class DltConnectionSettings:
 
 @dataclass(slots=True)
 class AppSettings:
-    output_root: Path = Path("C:/Users/dTPMSTestUtility")
-    temp_log_template: str = "{timestamp}_dlt-viewer-tmpfile.dlt"
+    output_root: Path = Path(os.environ.get("LOCALAPPDATA", str(Path.home()))) / "dTPMSTestUtility"
+    enable_swut_startup_self_check: bool = False
+    ssh_timeout_seconds: int = int(os.environ.get("TPMS_SSH_TIMEOUT_SECONDS", "15"))
+    sga_host: str = os.environ.get("TPMS_SGA_HOST", "169.254.4.10")
+    sga_user: str = os.environ.get("TPMS_SGA_USER", "swupdate")
+    sga_password: str = os.environ.get("TPMS_SGA_PASSWORD", "")
+    vcu_host: str = os.environ.get("TPMS_VCU_HOST", "198.19.0.1")
+    vcu_user: str = os.environ.get("TPMS_VCU_USER", "root")
+    vcu_password: str = os.environ.get("TPMS_VCU_PASSWORD", "")
+    tawm_restart_command: str = os.environ.get(
+        "TPMS_TAWM_RESTART_COMMAND",
+        "/opt/csp/bin/em_control --restart tyre_and_wheel_monitor",
+    )
+    temp_log_template: str = "{timestamp}_dlt_tmpfile.dlt"
     final_log_template: str = "{timestamp}_test.dlt"
     tawm_export_template: str = "{timestamp}_Tawm_filtered.dlt"
     tawm_lib_export_template: str = "{timestamp}_Tawm_LIB_ascii.txt"

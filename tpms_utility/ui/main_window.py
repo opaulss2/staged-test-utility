@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import textwrap
 import tkinter as tk
 from tkinter import messagebox, ttk
 
@@ -13,7 +14,7 @@ class MainWindow:
     def __init__(self, root: tk.Tk) -> None:
         self.root = root
         self.root.title("TPMS Test Utility")
-        self.root.geometry("1180x720")
+        self.root.geometry("1920x720")
 
         self._load_sun_valley_theme()
 
@@ -36,15 +37,20 @@ class MainWindow:
 
         self._build_layout()
         self._refresh_stage_buttons()
+        self._run_startup_self_checks()
 
         self.root.bind("<space>", self._on_space)
         self.root.protocol("WM_DELETE_WINDOW", self._on_close)
 
     def _load_sun_valley_theme(self) -> None:
-        theme_file = Path("vendor/sun-valley-ttk-theme/sun-valley.tcl")
-        if theme_file.exists():
-            self.root.tk.call("source", str(theme_file))
-            self.root.tk.call("set_theme", "light")
+        theme_file = Path("vendor/sun-valley-ttk-theme/sv_ttk/sv.tcl")
+        if not theme_file.exists():
+            raise FileNotFoundError(
+                "Sun Valley theme is required but missing at vendor/sun-valley-ttk-theme/sv_ttk/sv.tcl"
+            )
+        self.root.tk.call("source", str(theme_file))
+        self.root.tk.call("ttk::style", "theme", "use", "sun-valley-light")
+        self.root.event_generate("<<ThemeChanged>>")
 
     def _build_layout(self) -> None:
         self.root.columnconfigure(0, weight=3)
@@ -52,18 +58,17 @@ class MainWindow:
         self.root.rowconfigure(0, weight=2)
         self.root.rowconfigure(1, weight=1)
 
-        stage_frame = ttk.LabelFrame(self.root, text="Stages 0-9")
+        max_stage = max((stage.stage_id for stage in self.controller.stages), default=0)
+        stage_frame = ttk.LabelFrame(self.root, text=f"Stages 0-{max_stage}")
         stage_frame.grid(row=0, column=0, sticky="nsew", padx=12, pady=12)
+        stage_frame.rowconfigure(0, weight=1)
 
-        for idx in range(10):
-            stage_frame.columnconfigure(idx % 5, weight=1)
-            stage_frame.rowconfigure(idx // 5, weight=1)
-            label = f"Stage {idx}\n(Not configured)"
-            if idx < len(self.controller.stages):
-                stage = self.controller.stages[idx]
-                label = f"Stage {idx}\n{stage.name}"
+        for idx in range(len(self.controller.stages)):
+            stage_frame.columnconfigure(idx, weight=1, uniform="stage")
+            stage = self.controller.stages[idx]
+            label = self._format_stage_label(stage.stage_id, stage.name)
             button = ttk.Button(stage_frame, text=label, command=lambda i=idx: self._select_stage(i))
-            button.grid(row=idx // 5, column=idx % 5, sticky="nsew", padx=8, pady=8, ipadx=20, ipady=24)
+            button.grid(row=0, column=idx, sticky="nsew", padx=8, pady=8, ipadx=12, ipady=28)
             self.stage_buttons[idx] = button
 
         details_frame = ttk.LabelFrame(self.root, text="Status")
@@ -97,6 +102,19 @@ class MainWindow:
             self.status_var.set("Execution failed")
             messagebox.showerror("Stage execution error", str(exc))
 
+    def _run_startup_self_checks(self) -> None:
+        if not self.controller.app_settings.enable_swut_startup_self_check:
+            self._append_log("Startup SWUT self-check is disabled")
+            return
+
+        result = self.controller.swut.startup_self_check()
+        if result.success:
+            self._append_log(f"SWUT startup self-check: {result.details}")
+            return
+
+        self.status_var.set("SWUT self-check failed")
+        self._append_log(f"SWUT startup self-check failed: {result.details}")
+
     def _select_stage(self, index: int) -> None:
         if index >= len(self.controller.stages):
             return
@@ -117,6 +135,11 @@ class MainWindow:
         self.log_text.insert("end", f"{message}\n")
         self.log_text.see("end")
         self.log_text.configure(state="disabled")
+
+    @staticmethod
+    def _format_stage_label(stage_id: int, stage_name: str) -> str:
+        wrapped_name = textwrap.fill(stage_name, width=16)
+        return f"Stage {stage_id}\n{wrapped_name}"
 
     def _set_timer(self, remaining_seconds: int) -> None:
         minutes, seconds = divmod(remaining_seconds, 60)
