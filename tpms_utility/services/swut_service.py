@@ -1,9 +1,13 @@
 from __future__ import annotations
 
+import contextlib
 from dataclasses import dataclass
 from datetime import datetime
+import io
+import json
 import os
 from pathlib import Path
+from typing import Any, Callable
 
 try:
     from swut.library.diagnostic_library import DiagnosticLibrary
@@ -59,7 +63,7 @@ class SwutService:
             return hex_string
         return " ".join(hex_string[i : i + 2] for i in range(0, len(hex_string), 2))
 
-    def _send_hpa_request(self, request_hex: str, expected: str | None = None, timeout: int | None = None) -> None:
+    def _send_hpa_request(self, request_hex: str, expected: str | None = None, timeout: int | None = None) -> Any:
         if self._get_diag_object() is None:
             raise RuntimeError(
                 "SWUT is not installed. Install SWUT from the private repository before running UDS stages."
@@ -73,45 +77,75 @@ class SwutService:
         if timeout is not None:
             kwargs["timeout"] = timeout
 
-        self._get_diag_object().send_request(*args, **kwargs)
+        return self._get_diag_object().send_request(*args, **kwargs)
 
-    def _unlock_security_area(self, area: str) -> None:
+    def _unlock_security_area(self, area: str) -> Any:
         if self._get_diag_object() is None:
             raise RuntimeError(
                 "SWUT is not installed. Install SWUT from the private repository before running UDS stages."
             )
-        self._get_diag_object().unlock_security_area(
+        return self._get_diag_object().unlock_security_area(
             area,
             "on",
             "HPA",
             pin=self.hpa_pin,
         )
 
-    def _execute_mapped_command(self, normalized_command: str) -> None:
+    def _execute_mapped_command(self, normalized_command: str) -> Any:
         if normalized_command == "1003":
-            self._send_hpa_request("10 03", "response should contain 32 01 F4")
-            return
+            return self._send_hpa_request("10 03", "response should contain 32 01 F4")
         if normalized_command == "2717":
-            self._unlock_security_area("17")
-            return
+            return self._unlock_security_area("17")
         if normalized_command == "2705":
-            self._unlock_security_area("05")
-            return
+            return self._unlock_security_area("05")
         if normalized_command == "2E20EB20000001200000022000000320000004":
-            self._send_hpa_request(
+            return self._send_hpa_request(
                 "2E 20 EB 20000001200000022000000320000004",
                 "response should match 6E 20 EB",
                 timeout=10,
             )
-            return
         if normalized_command == "3101DF04":
-            self._send_hpa_request(
+            return self._send_hpa_request(
                 "31 01 DF 04",
                 "response should contain 71 01 DF 04 30",
             )
-            return
 
-        self._send_hpa_request(self._format_hex_bytes(normalized_command))
+        return self._send_hpa_request(self._format_hex_bytes(normalized_command))
+
+    @staticmethod
+    def _to_jsonable(value: Any) -> Any:
+        if value is None or isinstance(value, (str, int, float, bool)):
+            return value
+        if isinstance(value, bytes):
+            return value.hex()
+        if isinstance(value, dict):
+            return {str(k): SwutService._to_jsonable(v) for k, v in value.items()}
+        if isinstance(value, (list, tuple, set)):
+            return [SwutService._to_jsonable(v) for v in value]
+        if hasattr(value, "__dict__"):
+            return {
+                k: SwutService._to_jsonable(v)
+                for k, v in vars(value).items()
+                if not k.startswith("_")
+            }
+        return str(value)
+
+    def _response_to_json(self, response: Any) -> str:
+        payload = self._to_jsonable(response)
+        return json.dumps(payload, ensure_ascii=True, default=str)
+
+    @staticmethod
+    def _capture_console(call: Callable[[], Any]) -> tuple[Any, str]:
+        buffer = io.StringIO()
+        with contextlib.redirect_stdout(buffer), contextlib.redirect_stderr(buffer):
+            result = call()
+        return result, buffer.getvalue().strip()
+
+    def _compose_details(self, response: Any, console_output: str) -> str:
+        parts = [f"response={self._response_to_json(response)}"]
+        if console_output:
+            parts.append(f"stdout={console_output}")
+        return " | ".join(parts)
 
     def _append_audit_log(self, command: str, result: str) -> None:
         timestamp = datetime.now().isoformat(timespec="seconds")
@@ -124,9 +158,15 @@ class SwutService:
     def startup_self_check(self) -> UdsCommandResult:
         command = "SELF_CHECK 22F186"
         try:
-            self._send_hpa_request("22 F1 86", "response should match 62 F1 86 01")
+            response, console_output = self._capture_console(
+                lambda: self._send_hpa_request("22 F1 86", "response should match 62 F1 86 01")
+            )
             self._append_audit_log(command, "OK")
-            return UdsCommandResult(command=command, success=True, details="HPA self-check passed")
+            return UdsCommandResult(
+                command=command,
+                success=True,
+                details=self._compose_details(response, console_output),
+            )
         except Exception as exc:  # noqa: BLE001
             self._append_audit_log(command, "ERROR")
             return UdsCommandResult(command=command, success=False, details=str(exc))
@@ -136,13 +176,21 @@ class SwutService:
         if not normalized:
             return UdsCommandResult(command=command, success=False, details="Empty command")
 
+        console_output = ""
         try:
-            self._execute_mapped_command(normalized)
+            response, console_output = self._capture_console(lambda: self._execute_mapped_command(normalized))
             self._append_audit_log(command, "OK")
-            return UdsCommandResult(command=command, success=True, details="Executed via SWUT")
+            return UdsCommandResult(
+                command=command,
+                success=True,
+                details=self._compose_details(response, console_output),
+            )
         except Exception as exc:  # noqa: BLE001
             self._append_audit_log(command, "ERROR")
-            return UdsCommandResult(command=command, success=False, details=str(exc))
+            detail = str(exc)
+            if console_output:
+                detail = f"{detail} | stdout={console_output}"
+            return UdsCommandResult(command=command, success=False, details=detail)
 
     def run_batch(self, commands: list[str]) -> list[UdsCommandResult]:
         return [self.run_uds_command(command) for command in commands]

@@ -19,7 +19,7 @@ _STAGE_FRAME_WIDTH = 860
 _STAGE_FRAME_HEIGHT = 360
 _DETAILS_FRAME_WIDTH = 360
 _DETAILS_FRAME_HEIGHT = 360
-_LOG_FRAME_HEIGHT = 180
+_LOG_FRAME_HEIGHT = 380
 _DETAILS_WRAP = 320
 
 
@@ -27,7 +27,7 @@ class MainWindow:
     def __init__(self, root: tk.Tk) -> None:
         self.root = root
         self.root.title("TPMS Test Utility")
-        self.root.geometry("1280x576")
+        self.root.geometry("1280x776")
 
         self._load_sun_valley_theme()
 
@@ -36,7 +36,7 @@ class MainWindow:
         self.current_stage_var = tk.StringVar(value="Current stage: 0")
         self.timer_stage_var = tk.StringVar(value="Timed stage idle")
 
-        self.log_text = tk.Text(self.root, height=14, state="disabled")
+        self.log_text: tk.Text | None = None
         self.stage_buttons: dict[int, ttk.Button] = {}
         self.stage_frames: dict[int, tk.Frame] = {}
         self.timer_canvas: tk.Canvas | None = None
@@ -170,7 +170,8 @@ class MainWindow:
         log_frame.grid_propagate(False)
         log_frame.columnconfigure(0, weight=1)
         log_frame.rowconfigure(0, weight=1)
-        self.log_text.grid(in_=log_frame, row=0, column=0, sticky="nsew", padx=8, pady=8)
+        self.log_text = tk.Text(log_frame, height=14, state="disabled")
+        self.log_text.grid(row=0, column=0, sticky="nsew", padx=8, pady=8)
 
     def _on_space(self, _: tk.Event) -> None:
         try:
@@ -214,6 +215,8 @@ class MainWindow:
                 button.state(["!pressed"])
 
     def _append_log(self, message: str) -> None:
+        if self.log_text is None:
+            return
         self.log_text.configure(state="normal")
         self.log_text.insert("end", f"{message}\n")
         self.log_text.see("end")
