@@ -1,0 +1,3 @@
+[submodule "vendor/sun-valley-ttk-theme"]
+	path = vendor/sun-valley-ttk-theme
+	url = https://github.com/rdbende/Sun-Valley-ttk-theme.git

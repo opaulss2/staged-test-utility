@@ -14,18 +14,26 @@ Desktop Python/Tkinter utility for running the TPMS validation cycle (stages 0-6
 
 1. Windows with Python 3.11+.
 2. Network access to SGA and VCU targets.
-3. Local clone contains vendor/sun-valley-ttk-theme/sv_ttk/sv.tcl.
+3. Sun Valley theme submodule initialized at vendor/sun-valley-ttk-theme.
 4. Access to your internal Artifactory PyPI mirror.
 
 ## Setup (step-by-step)
 
-1. Create a virtual environment:
+1. Initialize submodules (required for mandatory Sun Valley theme):
+
+```powershell
+git submodule update --init --recursive
+```
+
+The repository pins the Sun Valley theme to a fixed commit via submodule gitlink.
+
+2. Create a virtual environment:
 
 ```powershell
 python -m venv .venv
 ```
 
-2. Manually create .venv/pip.ini for your Artifactory mirror.
+3. Manually create .venv/pip.ini for your Artifactory mirror.
 
 Example template (replace placeholders):
 
@@ -40,25 +48,25 @@ trusted-host = <ARTIFACTORY_HOST>
 
 If your mirror requires credentials, use your approved internal method (token, keyring, or URL format required by your organization).
 
-3. Activate the environment:
+4. Activate the environment:
 
 ```powershell
 .\.venv\Scripts\Activate.ps1
 ```
 
-4. Install project dependencies:
+5. Install project dependencies:
 
 ```powershell
 python -m pip install -e .
 ```
 
-5. Create local runtime config:
+6. Create local runtime config:
 
 ```powershell
 Copy-Item .env.example .env
 ```
 
-6. Edit .env with your target credentials and SWUT PIN.
+7. Edit .env with your target credentials and SWUT PIN.
 
 ## .env configuration
 
@@ -126,7 +134,7 @@ Per run, generated files include:
 - Stage 3 SSH restart fails:
 	verify .env host/user/password values and target reachability.
 - Theme load fails:
-	verify vendor/sun-valley-ttk-theme/sv_ttk/sv.tcl exists.
+	run git submodule update --init --recursive and verify vendor/sun-valley-ttk-theme/sv_ttk/sv.tcl exists.
 - Stage 6 export blocked:
 	stage 5 timer must finish first.
 

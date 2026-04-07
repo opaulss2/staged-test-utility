@@ -29,6 +29,8 @@ The user environment may require a custom mirror. Respect existing local setup.
 - Python dependencies install via: python -m pip install -e .
 - Custom package index may be configured manually in .venv/pip.ini.
 - Runtime variables are loaded from .env by tpms_utility/config.py.
+- Sun Valley theme is a git submodule under vendor/sun-valley-ttk-theme.
+- Initialize submodules before runtime checks: git submodule update --init --recursive.
 
 Never commit secrets from .env or .venv/pip.ini.
 
@@ -56,6 +58,7 @@ Do not reorder stages unless explicitly requested by the user.
 
 - Do not reintroduce runtime dependency on dlt-viewer binaries/tools for stage flow.
 - Keep Sun Valley theme mandatory.
+- Keep Sun Valley theme pinned through submodule commit updates only.
 - Preserve output location under LOCALAPPDATA/dTPMSTestUtility unless asked otherwise.
 - Avoid changing public behavior silently; log important operational changes.
 
