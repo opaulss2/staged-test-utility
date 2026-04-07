@@ -1,0 +1,17 @@
+.gitconfig
+CMakeLists.txt.user
+build/
+.project
+Makefile
+buildlib/
+release/
+.cproject
+.settings
+*.orig
+*~
+.idea
+.cache
+compile_commands.json
+# deb packaging directories
+debian/
+debtmp/
