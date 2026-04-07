@@ -196,7 +196,9 @@ def _extract_payload_text(payload: bytes) -> str:
     latin = payload.decode("latin-1", errors="ignore")
     matches = _PRINTABLE_TEXT_RE.findall(latin)
     if matches:
-        return " ".join(matches)
+        # DLT verbose payloads can contain printable metadata fragments before the actual text.
+        # Keep the longest printable segment to avoid exporting synthetic prefixes.
+        return max(matches, key=len).strip()
     return latin.strip("\x00\r\n\t ")
 
 
