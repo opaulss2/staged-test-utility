@@ -231,6 +231,9 @@ class CycleController:
             f"tmp file {runtime.temp_log_path}"
         )
 
+    def stage_dummy(self, _: CycleRuntime) -> None:
+        self.on_log("Dummy stage executed")
+
     def stage5_clear_start_test(self, runtime: CycleRuntime) -> None:
         self.dlt.clear_tmp_log()
         self.on_log(f"Temporary log cleared: {runtime.temp_log_path}")
