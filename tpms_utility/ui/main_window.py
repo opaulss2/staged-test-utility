@@ -21,6 +21,8 @@ _DETAILS_FRAME_WIDTH = 360
 _DETAILS_FRAME_HEIGHT = 360
 _LOG_FRAME_HEIGHT = 380
 _DETAILS_WRAP = 320
+_LOG_MAX_LINES = 2000
+_LOG_TRIM_EVERY = 100
 
 
 class MainWindow:
@@ -45,6 +47,8 @@ class MainWindow:
         self.timer_wheel_job: str | None = None
         self.timer_running = False
         self.pending_timer_seconds: int | None = 0
+        self._log_line_count = 0
+        self._log_append_count = 0
 
         self.controller = CycleController(
             stages=[],
@@ -58,7 +62,7 @@ class MainWindow:
 
         self._build_layout()
         self._refresh_stage_buttons()
-        self._run_startup_self_checks()
+        self.root.after(0, self._run_startup_self_checks)
         self._process_pending_timer_update()
 
         self.root.bind("<space>", self._on_space)
@@ -219,8 +223,24 @@ class MainWindow:
             return
         self.log_text.configure(state="normal")
         self.log_text.insert("end", f"{message}\n")
+        self._log_append_count += 1
+        self._log_line_count += message.count("\n") + 1
+        if self._log_append_count % _LOG_TRIM_EVERY == 0 and self._log_line_count > _LOG_MAX_LINES:
+            self._trim_log_lines()
         self.log_text.see("end")
         self.log_text.configure(state="disabled")
+
+    def _trim_log_lines(self) -> None:
+        if self.log_text is None:
+            return
+
+        trim_count = self._log_line_count - _LOG_MAX_LINES
+        if trim_count <= 0:
+            return
+
+        self.log_text.delete("1.0", f"{trim_count + 1}.0")
+        remaining_lines = int(self.log_text.index("end-1c").split(".")[0])
+        self._log_line_count = max(remaining_lines, 0)
 
     @staticmethod
     def _format_stage_label(stage_id: int, stage_name: str) -> str:

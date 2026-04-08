@@ -3,6 +3,7 @@ from __future__ import annotations
 import contextlib
 from dataclasses import dataclass
 from datetime import datetime
+import importlib
 import io
 import json
 import os
@@ -10,11 +11,6 @@ from pathlib import Path
 from typing import Any, Callable
 import urllib.error
 import urllib.request
-
-try:
-    from swut.library.diagnostic_library import DiagnosticLibrary
-except ImportError:  # pragma: no cover - depends on private package installation
-    DiagnosticLibrary = None  # type: ignore[assignment]
 
 
 @dataclass(slots=True)
@@ -34,6 +30,8 @@ class SwutService:
         self.output_dir = output_dir
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.audit_log = self.output_dir / "swut_audit.log"
+        self.audit_log_backup = self.output_dir / "swut_audit.log.1"
+        self.audit_log_max_bytes = int(os.environ.get("TPMS_SWUT_AUDIT_LOG_MAX_BYTES", str(5 * 1024 * 1024)))
         self.mock_url = (mock_url or os.environ.get("TPMS_SWUT_MOCK_URL", "")).strip().rstrip("/")
         self.hpa_host = os.environ.get("SWUT_HPA_HOST", os.environ.get("TPMS_TARGET_HOST", "169.254.4.10"))
         os.environ.setdefault("SWUT_HPA_HOST", self.hpa_host)
@@ -43,12 +41,29 @@ class SwutService:
         )
         self._diag_obj = None
         self._diag_obj_initialised = False
+        self._diagnostic_library_class: Any | None = None
+        self._diagnostic_library_resolved = False
+
+    def _resolve_diagnostic_library_class(self) -> Any | None:
+        if self._diagnostic_library_resolved:
+            return self._diagnostic_library_class
+
+        self._diagnostic_library_resolved = True
+        try:
+            module = importlib.import_module("swut.library.diagnostic_library")
+        except ImportError:  # pragma: no cover - depends on private package installation
+            self._diagnostic_library_class = None
+            return None
+
+        self._diagnostic_library_class = getattr(module, "DiagnosticLibrary", None)
+        return self._diagnostic_library_class
 
     def _get_diag_object(self):
         if not self._diag_obj_initialised:
             self._diag_obj_initialised = True
-            if DiagnosticLibrary is not None:
-                self._diag_obj = DiagnosticLibrary()
+            diagnostic_library_class = self._resolve_diagnostic_library_class()
+            if diagnostic_library_class is not None:
+                self._diag_obj = diagnostic_library_class()
         return self._diag_obj
 
     @staticmethod
@@ -153,10 +168,23 @@ class SwutService:
     def _append_audit_log(self, command: str, result: str) -> None:
         timestamp = datetime.now().isoformat(timespec="seconds")
         line = f"{timestamp} | {result} | {command}\n"
-        self.audit_log.write_text(
-            self.audit_log.read_text(encoding="utf-8") + line if self.audit_log.exists() else line,
-            encoding="utf-8",
-        )
+        self._rotate_audit_log_if_needed(extra_bytes=len(line.encode("utf-8")))
+        with self.audit_log.open("a", encoding="utf-8") as handle:
+            handle.write(line)
+
+    def _rotate_audit_log_if_needed(self, extra_bytes: int) -> None:
+        if self.audit_log_max_bytes <= 0:
+            return
+        if not self.audit_log.exists():
+            return
+
+        current_size = self.audit_log.stat().st_size
+        if current_size + extra_bytes <= self.audit_log_max_bytes:
+            return
+
+        if self.audit_log_backup.exists():
+            self.audit_log_backup.unlink()
+        self.audit_log.replace(self.audit_log_backup)
 
     def startup_self_check(self) -> UdsCommandResult:
         command = "SELF_CHECK 22F186"

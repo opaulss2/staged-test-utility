@@ -18,6 +18,10 @@ Implication for remediation work:
 
 ## 1) SWUT Audit Log Write Amplification
 
+Status:
+- Implemented on 2026-04-08 in `tpms_utility/services/swut_service.py`.
+- Audit logging now uses append mode with lightweight single-backup rotation.
+
 Primary location:
 - tpms_utility/services/swut_service.py
 
@@ -42,6 +46,10 @@ Validation checks:
 - Verify log integrity across rotation boundaries.
 
 ## 2) UI Execution Log Memory Growth
+
+Status:
+- Implemented on 2026-04-08 in `tpms_utility/ui/main_window.py`.
+- Execution log now uses bounded retention with periodic trimming.
 
 Primary location:
 - tpms_utility/ui/main_window.py

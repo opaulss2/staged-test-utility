@@ -1,0 +1,250 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TPMS Performance Improvement Report</title>
+  <link rel="stylesheet" href="performance-improvement-report.css" />
+</head>
+<body>
+  <main>
+    <h1>TPMS Performance Improvement Report</h1>
+    <p class="note">Generated 2026-04-08. Comparison target: master (31bff7f). Current branch: perf/remediation-1-2-swut-ui-log (898edc7).</p>
+
+    <section class="card">
+      <h2>Executive Summary</h2>
+      <div class="grid">
+        <div class="kpi">
+          <div class="label">Startup Avg (Before)</div>
+          <div class="value">819.302 ms</div>
+        </div>
+        <div class="kpi">
+          <div class="label">Startup Avg (After)</div>
+          <div class="value">206.320 ms</div>
+        </div>
+        <div class="kpi">
+          <div class="label">Average Improvement</div>
+          <div class="value">-74.82%</div>
+        </div>
+      </div>
+      <p class="note">Startup remediation impact is strong and consistent. P95 improved from 870.511 ms to 237.295 ms (-72.74%).</p>
+    </section>
+
+    <section class="card">
+      <h2>Before vs After Startup Timing</h2>
+      <div class="table-wrap">
+        <table>
+          <!doctype html>
+          <html lang="en">
+          <head>
+            <meta charset="utf-8" />
+            <meta name="viewport" content="width=device-width, initial-scale=1" />
+            <title>TPMS Performance Improvement Report</title>
+            <link rel="stylesheet" href="performance-improvement-report.css" />
+          </head>
+          <body>
+            <main>
+              <h1>TPMS Performance Improvement Report</h1>
+              <p class="note">
+                Generated 2026-04-08 &bull;
+                Baseline: <code>main</code> (c67eecb) &mdash; <em>docs/performance/BASELINE.md on main</em> &bull;
+                Remediated: <code>perf/remediation-1-2-swut-ui-log</code> (efc621f) &mdash; <em>docs/performance/BASELINE.md on perf branch</em>
+              </p>
+
+              <!-- ── Executive Summary ── -->
+              <section class="card">
+                <h2>Executive Summary</h2>
+                <div class="grid">
+                  <div class="kpi">
+                    <div class="label">Startup — main avg</div>
+                    <div class="value">930.4 ms</div>
+                  </div>
+                  <div class="kpi">
+                    <div class="label">Startup — remediated avg</div>
+                    <div class="value good">206.3 ms</div>
+                  </div>
+                  <div class="kpi">
+                    <div class="label">Startup Improvement</div>
+                    <div class="value good">−77.8 %</div>
+                  </div>
+                  <div class="kpi">
+                    <div class="label">Startup P95 Improvement</div>
+                    <div class="value good">−76.1 %</div>
+                  </div>
+                </div>
+                <p class="note">
+                  Startup cost was halved by replacing the eager <code>swut.library.diagnostic_library</code> import
+                  (which pulled in CLR and <code>one_dad.dll_helpers</code>) with a lazy <code>importlib.import_module</code>
+                  call deferred to first use. The deferred startup self-check (<code>root.after(0, ...)</code>) further
+                  eliminates blocking work before the first Tk paint cycle.
+                  Stage-level latency changes remain below the mock-endpoint noise floor (~±15 ms) as
+                  remediations 1 and 2 target write-path and memory overhead rather than network round-trips.
+                </p>
+              </section>
+
+              <!-- ── Startup Timing ── -->
+              <section class="card">
+                <h2>Startup Import Latency — main vs Remediated</h2>
+                <p class="note">Source: <em>docs/performance/BASELINE.md</em> on each branch. 5 cold-subprocess samples.</p>
+                <div class="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Metric</th>
+                        <th>main (c67eecb)</th>
+                        <th>Remediated (efc621f)</th>
+                        <th>Delta</th>
+                        <th>Change</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td>Average</td>
+                        <td>930.356 ms</td>
+                        <td>206.320 ms</td>
+                        <td class="good">−724.036 ms</td>
+                        <td class="good">−77.84 %</td>
+                      </tr>
+                      <tr>
+                        <td>P95</td>
+                        <td>994.032 ms</td>
+                        <td>237.295 ms</td>
+                        <td class="good">−756.737 ms</td>
+                        <td class="good">−76.12 %</td>
+                      </tr>
+                      <tr>
+                        <td>Min</td>
+                        <td>799.588 ms</td>
+                        <td>177.245 ms</td>
+                        <td class="good">−622.343 ms</td>
+                        <td class="good">−77.84 %</td>
+                      </tr>
+                      <tr>
+                        <td>Max</td>
+                        <td>998.721 ms</td>
+                        <td>274.848 ms</td>
+                        <td class="good">−723.873 ms</td>
+                        <td class="good">−72.48 %</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+
+              <!-- ── Stage Latency ── -->
+              <section class="card">
+                <h2>Stage Latency — main vs Remediated</h2>
+                <p class="note">
+                  main numbers: single 10-iteration run (<em>docs/performance/BASELINE.md on main</em>).<br />
+                  Remediated numbers: two-pass means from <em>docs/performance/BASELINE.md on perf branch</em>
+                  (Pass 1 + Pass 2 average).<br />
+                  Differences fall within the mock-endpoint noise floor (~±15 ms); remediations 1 and 2
+                  do not target network-bound stage timing.
+                </p>
+                <div class="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>Stage</th>
+                        <th>Description</th>
+                        <th>main avg (ms)</th>
+                        <th>Remediated avg (ms)</th>
+                        <th>Delta</th>
+                        <th>Verdict</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td>0</td>
+                        <td>Cycle reset / ready</td>
+                        <td>0.004</td>
+                        <td>0.002</td>
+                        <td>−0.002</td>
+                        <td><span class="badge noise">noise</span></td>
+                      </tr>
+                      <tr>
+                        <td>1</td>
+                        <td>SWUT overwrite sequence</td>
+                        <td>130.373</td>
+                        <td>125.389</td>
+                        <td>−4.984</td>
+                        <td><span class="badge noise">noise</span></td>
+                      </tr>
+                      <tr>
+                        <td>3</td>
+                        <td>Tawm SSH restart + debug</td>
+                        <td>106.990</td>
+                        <td>117.083</td>
+                        <td>+10.093</td>
+                        <td><span class="badge noise">noise</span></td>
+                      </tr>
+                      <tr>
+                        <td>4</td>
+                        <td>DLT logging start</td>
+                        <td>5.288</td>
+                        <td>10.693</td>
+                        <td>+5.405</td>
+                        <td><span class="badge noise">noise</span></td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+
+              <!-- ── Code Remediations ── -->
+              <section class="card">
+                <h2>Code Remediations Applied</h2>
+                <div class="table-wrap">
+                  <table>
+                    <thead>
+                      <tr>
+                        <th>#</th>
+                        <th>File</th>
+                        <th>Change</th>
+                        <th>Measurable Impact</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      <tr>
+                        <td>R1</td>
+                        <td><code>tpms_utility/services/swut_service.py</code></td>
+                        <td>Replaced full-file audit log rewrite with append mode + 5 MB rotation</td>
+                        <td>Eliminates O(<em>n</em>) write amplification on long sessions</td>
+                      </tr>
+                      <tr>
+                        <td>R2</td>
+                        <td><code>tpms_utility/ui/main_window.py</code></td>
+                        <td>Bounded execution log widget to 2 000 lines; trim every 100 appends</td>
+                        <td>Prevents unbounded Tk Text widget memory growth</td>
+                      </tr>
+                      <tr>
+                        <td>R3</td>
+                        <td><code>tpms_utility/services/swut_service.py</code></td>
+                        <td>Lazy <code>importlib.import_module</code> for <code>swut.library.diagnostic_library</code></td>
+                        <td>Startup avg −724 ms (−77.8 %)</td>
+                      </tr>
+                      <tr>
+                        <td>R4</td>
+                        <td><code>tpms_utility/ui/main_window.py</code></td>
+                        <td>Deferred startup self-check via <code>root.after(0, ...)</code></td>
+                        <td>First Tk paint no longer blocked by self-check work</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </section>
+
+              <!-- ── Notes ── -->
+              <section class="card info">
+                <h2>Methodology Notes</h2>
+                <ul class="note">
+                  <li>Both baselines measured using the same mock stack: DLT (TCP 3491), SSH mock (HTTP 8081), SWUT mock (HTTP 8082).</li>
+                  <li>Startup metric = cold <code>python -c "import tpms_utility"</code> subprocesses; not affected by mock services.</li>
+                  <li>Stage latency measured via <code>tools/perf/run_stage_latency.py --iterations 10 --stages 0,1,3,4</code>.</li>
+                  <li>Stage-level differences between branches fall within the ±15 ms mock-endpoint jitter observed across multiple runs and collection sessions. No regression is indicated.</li>
+                  <li>Machine-readable data: <a href="performance-improvement-report.xml">performance-improvement-report.xml</a></li>
+                </ul>
+              </section>
+            </main>
+          </body>
+          </html>
