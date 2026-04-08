@@ -114,7 +114,57 @@ Validation checks:
 - Verify all four required fault tokens are still always visible.
 - Confirm timer-shortening behavior remains unchanged.
 
-## 5) Runtime Side-Effect Risk In Demo Helper
+## 5) Runtime Reuse Across Wrapped Cycles
+
+Primary location:
+- tpms_utility/cycle_controller.py
+
+Current behavior:
+- `runtime_context()` keeps the original timestamp and output paths for the controller lifetime.
+- Stage progression wraps from stage 6 back to stage 0 without clearing the prior run context.
+
+Why medium:
+- Later cycles can overwrite temp, final, and export artifacts from an earlier run.
+- Per-cycle traceability is weakened for operators reviewing outputs.
+
+Mitigation strategy:
+- Reset the runtime object when the controller wraps to stage 0.
+- Alternatively, recreate runtime state during stage 0 when an earlier cycle has already completed.
+
+Criticality reduction:
+- Restores one-output-set-per-cycle behavior.
+- Reduces accidental artifact overwrite and operator confusion between runs.
+
+Validation checks:
+- Run two full cycles back-to-back and verify distinct timestamps/artifact paths.
+- Confirm stage 6 exports from the second run do not overwrite the first run.
+
+## 6) Password-Based SSH Host Key Verification
+
+Primary location:
+- tpms_utility/cycle_controller.py
+
+Current behavior:
+- Password-based SSH restart uses Paramiko `AutoAddPolicy()` for both SGA and VCU hops.
+
+Why medium:
+- Unknown host keys are accepted silently.
+- Stage 3 restart can succeed against an unintended or spoofed host in misconfigured environments.
+
+Mitigation strategy:
+- Load system or explicit known-hosts data and reject unknown hosts by default.
+- If lab convenience requires relaxed behavior, gate it behind an explicit insecure-development setting.
+
+Criticality reduction:
+- Restores host authenticity checks for the stage 3 restart path.
+- Makes target misconfiguration fail fast instead of silently trusting new hosts.
+
+Validation checks:
+- Verify known hosts connect successfully.
+- Verify unknown hosts fail with an actionable error.
+- Confirm mock restart flow is unaffected.
+
+## 7) Runtime Side-Effect Risk In Demo Helper
 
 Primary location:
 - tpms_utility/services/swut_demo.py
@@ -137,7 +187,7 @@ Validation checks:
 - Verify import of demo module has no network/device side effects.
 - Confirm function behavior unchanged when explicit object is supplied.
 
-## 6) Small But Worthwhile Efficiency/Clarity Updates
+## 8) Small But Worthwhile Efficiency/Clarity Updates
 
 Primary locations:
 - tpms_utility/cycle_controller.py
@@ -161,12 +211,15 @@ Validation checks:
 1. SWUT audit append-only write path plus rotation.
 2. UI log retention cap.
 3. DLT buffered persistence.
-4. Payload logging rate control.
-5. Demo import side-effect cleanup.
-6. Minor idiomatic cleanups.
+4. Runtime reset between wrapped cycles.
+5. Payload logging rate control.
+6. Password-based SSH host verification hardening.
+7. Demo import side-effect cleanup.
+8. Minor idiomatic cleanups.
 
 Rationale:
-- The first three items provide the largest immediate reduction in latency and resource pressure.
+- The first four items remove the highest-impact latency and artifact-integrity risks.
+- SSH host verification hardening is operationally important, but can be sequenced after workflow-preserving runtime fixes.
 
 ## Suggested Safety Gates Before Merge
 
@@ -176,6 +229,8 @@ Rationale:
 - Stage 5 timer and shortening logic unchanged.
 - Stage 6 export still blocked until timer completion.
 - Jenkins optimization pipeline run completes with archived `output/perf/stage_latency.json` artifact.
+- Back-to-back cycle smoke test confirms unique artifacts per run after stage 6 wrap.
+- Password-based stage 3 restart verifies expected host keys and still fails fast on SSH errors.
 
 ## Optional Observability Additions
 

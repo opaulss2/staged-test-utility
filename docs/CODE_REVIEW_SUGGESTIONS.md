@@ -31,25 +31,37 @@ Excluded from review scope:
 
 ## Medium Priority
 
-4. **Limit payload logging verbosity during stage 5**
+4. **Preserve per-run runtime isolation across wrapped cycles**
+- File: `tpms_utility/cycle_controller.py`
+- Issue: `runtime_context()` caches the initial timestamp and output paths, while `advance_by_space()` wraps from stage 6 back to stage 0 without clearing `self.runtime`.
+- Risk: consecutive runs can overwrite temp/final/export artifacts from a prior cycle and blur operator traceability.
+- Suggestion: reset `self.runtime` when wrapping to stage 0, or reinitialize it at stage 0 when a previous run exists.
+
+5. **Tighten password-based SSH host verification**
+- File: `tpms_utility/cycle_controller.py`
+- Issue: `_restart_tawm_with_passwords()` uses `paramiko.AutoAddPolicy()` for both SGA and VCU connections.
+- Risk: unknown host keys are accepted silently, which weakens host authenticity checks in the stage 3 restart path.
+- Suggestion: load known hosts and use a reject policy by default, with an explicit opt-in override only for controlled lab environments.
+
+6. **Limit payload logging verbosity during stage 5**
 - File: `tpms_utility/cycle_controller.py`
 - Issue: `_on_payload()` logs every incoming payload string to the UI log.
 - Risk: This can flood the UI and amplify the unbounded-log performance issue.
 - Suggestion: Log only matched fault tokens or rate-limit payload logging (for example, sample every N messages).
 
-5. **Remove or use dead data model**
+7. **Remove or use dead data model**
 - File: `tpms_utility/services/dlt_service.py`
 - Issue: `DltMessage` dataclass is defined but not used.
 - Risk: Superfluous code increases maintenance burden and cognitive load.
 - Suggestion: Remove it, or wire it into the parsing/persistence API if intended for future use.
 
-6. **Avoid expensive list creation when only first failure is needed**
+8. **Avoid expensive list creation when only first failure is needed**
 - File: `tpms_utility/cycle_controller.py`
 - Issue: Stage methods build full `failures` lists, but only `failures[0]` is used.
 - Risk: Minor inefficiency and unnecessary allocation.
 - Suggestion: Use `next((r for r in results if not r.success), None)`.
 
-7. **Fix default argument instantiation anti-pattern**
+9. **Fix default argument instantiation anti-pattern**
 - File: `tpms_utility/services/swut_demo.py`
 - Issue: `itpms_did_read_sw_version(diag_obj: DiagnosticLibrary = DiagnosticLibrary())` creates an object at import time.
 - Risk: Surprising side effects, potential startup overhead, and shared mutable state.
@@ -57,19 +69,19 @@ Excluded from review scope:
 
 ## Low Priority / Idiomatic Improvements
 
-8. **Use `time.time()` once for storage header generation**
+10. **Use `time.time()` once for storage header generation**
 - File: `tpms_utility/services/dlt_protocol.py`
 - Issue: `make_storage_header()` calls `time.time()` twice for seconds/micros.
 - Risk: Small inconsistency between second and microsecond parts and minor redundant work.
 - Suggestion: Capture one timestamp value, then derive both parts.
 
-9. **Hoist regex import to module scope**
+11. **Hoist regex import to module scope**
 - File: `tpms_utility/services/dlt_service.py`
 - Issue: `_parse_profile()` imports `re` per call.
 - Risk: Tiny overhead and style inconsistency.
 - Suggestion: Move `import re` to top-level for cleaner idiomatic style.
 
-10. **Consider explicit type for SWUT diagnostic object accessor**
+12. **Consider explicit type for SWUT diagnostic object accessor**
 - File: `tpms_utility/services/swut_service.py`
 - Issue: `_get_diag_object()` has implicit dynamic return type.
 - Risk: Lower static-analysis clarity.
