@@ -101,6 +101,48 @@ Behavior:
 python .\main.py
 ```
 
+## Containerized mock environment for timing
+
+Use the mock stack to run deterministic timing checks without real SGA/VCU/SWUT targets.
+
+1. Start mocked endpoints:
+
+```powershell
+docker compose -f docker-compose.mock.yml up -d
+```
+
+2. Load mock profile variables for the active shell:
+
+```powershell
+Get-Content .env.mock | ForEach-Object {
+	if ($_ -match '^\s*#' -or $_ -notmatch '=') { return }
+	$key, $value = $_ -split '=', 2
+	[System.Environment]::SetEnvironmentVariable($key.Trim(), $value.Trim(), 'Process')
+}
+```
+
+3. Run stage-level latency measurement:
+
+```powershell
+python .\tools\perf\run_stage_latency.py --iterations 10 --stages 0,1,3,4
+```
+
+4. Review generated report:
+
+- output/perf/stage_latency.json
+
+5. Stop mocked endpoints:
+
+```powershell
+docker compose -f docker-compose.mock.yml down
+```
+
+Mock routing is opt-in and only active when these environment variables are set:
+
+- TPMS_SWUT_MOCK_URL
+- TPMS_SSH_MOCK_URL
+- TPMS_DLT_HOST and TPMS_DLT_PORT
+
 ## How to use the tool during a cycle
 
 1. Start the app.
@@ -142,6 +184,8 @@ Per run, generated files include:
 	run git submodule update --init --recursive and verify vendor/sun-valley-ttk-theme/sv_ttk/sv.tcl exists.
 - Stage 6 export blocked:
 	stage 5 timer must finish first.
+- Mock timing run fails to connect:
+	verify docker containers are running and TPMS_SWUT_MOCK_URL, TPMS_SSH_MOCK_URL, TPMS_DLT_HOST, TPMS_DLT_PORT are set in the current shell.
 
 ## Notes
 

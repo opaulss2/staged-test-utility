@@ -6,6 +6,9 @@ from pathlib import Path
 import subprocess
 import threading
 from typing import Callable
+import urllib.error
+import urllib.request
+import json
 
 from tpms_utility.config import AppSettings, DltConnectionSettings
 from tpms_utility.models import CycleRuntime, Stage
@@ -34,7 +37,7 @@ class CycleController:
 
         self.current_index = 0
         self.runtime: CycleRuntime | None = None
-        self.swut = SwutService(output_dir=Path("output"))
+        self.swut = SwutService(output_dir=Path("output"), mock_url=self.app_settings.swut_mock_url)
         self.dlt = DltService()
         self.audio = AudioService()
         self.exporter = LogExporter()
@@ -133,6 +136,11 @@ class CycleController:
     def _restart_tawm_in_hpa(self) -> None:
         self.on_log("Restarting Tawm in HPA via SSH hop (SGA -> VCU)")
 
+        if self.app_settings.ssh_mock_url:
+            self._restart_tawm_via_mock()
+            self.on_log("Tawm restart command completed via SSH mock endpoint")
+            return
+
         if self.app_settings.sga_password or self.app_settings.vcu_password:
             self._restart_tawm_with_passwords()
             self.on_log("Tawm restart command completed and SSH session closed")
@@ -159,6 +167,30 @@ class CycleController:
             detail = stderr or stdout or f"exit code {result.returncode}"
             raise RuntimeError(f"Stage 3 failed: Tawm restart over SSH failed: {detail}")
         self.on_log("Tawm restart command completed and SSH session closed")
+
+    def _restart_tawm_via_mock(self) -> None:
+        payload = {
+            "sga_host": self.app_settings.sga_host,
+            "vcu_host": self.app_settings.vcu_host,
+            "vcu_user": self.app_settings.vcu_user,
+            "command": self.app_settings.tawm_restart_command,
+        }
+        request = urllib.request.Request(
+            url=f"{self.app_settings.ssh_mock_url.rstrip('/')}/restart",
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=self.app_settings.ssh_timeout_seconds) as response:  # noqa: S310
+                body = response.read().decode("utf-8", errors="ignore")
+            parsed = json.loads(body) if body else {}
+        except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
+            raise RuntimeError(f"Stage 3 failed: Tawm restart mock request failed: {exc}") from exc
+
+        if not bool(parsed.get("success", True)):
+            detail = str(parsed.get("details", "mock restart failed"))
+            raise RuntimeError(f"Stage 3 failed: Tawm restart over SSH failed: {detail}")
 
     def _restart_tawm_with_passwords(self) -> None:
         try:
