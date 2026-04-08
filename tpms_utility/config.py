@@ -32,7 +32,7 @@ def _target_host_default() -> str:
 class DltConnectionSettings:
     ecu_id: str = "TPMS"
     hostname: str = os.environ.get("TPMS_DLT_HOST", _target_host_default())
-    port: int = 3491
+    port: int = int(os.environ.get("TPMS_DLT_PORT", "3491"))
     auto_reconnect_timeout_seconds: int = 5
     default_log_level: str = "Info"
     default_trace_status: str = "Off"
@@ -55,6 +55,7 @@ class AppSettings:
     output_root: Path = Path(os.environ.get("LOCALAPPDATA", str(Path.home()))) / "dTPMSTestUtility"
     enable_swut_startup_self_check: bool = False
     ssh_timeout_seconds: int = int(os.environ.get("TPMS_SSH_TIMEOUT_SECONDS", "15"))
+    ssh_mock_url: str = os.environ.get("TPMS_SSH_MOCK_URL", "")
     sga_host: str = os.environ.get("TPMS_SGA_HOST", _target_host_default())
     sga_user: str = os.environ.get("TPMS_SGA_USER", "swupdate")
     sga_password: str = os.environ.get("TPMS_SGA_PASSWORD", "")
@@ -66,11 +67,12 @@ class AppSettings:
         "/opt/csp/bin/em_control --restart tyre_and_wheel_monitor",
     )
     temp_log_template: str = "{timestamp}_dlt_tmpfile.dlt"
+    swut_mock_url: str = os.environ.get("TPMS_SWUT_MOCK_URL", "")
     final_log_template: str = "{timestamp}_test.dlt"
     tawm_export_template: str = "{timestamp}_Tawm_filtered.dlt"
     tawm_lib_export_template: str = "{timestamp}_Tawm_LIB_ascii.txt"
-    test_duration_seconds: int = 10 * 60
-    shortened_duration_seconds: int = 2 * 60
+    test_duration_seconds: int = int(os.environ.get("TPMS_TEST_DURATION_SECONDS", str(10 * 60)))
+    shortened_duration_seconds: int = int(os.environ.get("TPMS_SHORTENED_DURATION_SECONDS", str(2 * 60)))
     fault_tokens: set[str] = field(
         default_factory=lambda: {
             "fault id: 30 debounce status: 1",

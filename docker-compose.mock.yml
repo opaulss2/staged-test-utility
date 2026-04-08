@@ -1,0 +1,38 @@
+version: "3.9"
+
+services:
+  dlt-mock:
+    image: python:3.11-slim
+    working_dir: /app
+    command: ["python", "tools/mock_env/dlt_mock_server.py"]
+    volumes:
+      - ./:/app:ro
+    ports:
+      - "3491:3491"
+    environment:
+      MOCK_DLT_PORT: "3491"
+      MOCK_DLT_INTERVAL_SECONDS: "0.15"
+
+  ssh-mock:
+    image: python:3.11-slim
+    working_dir: /app
+    command: ["python", "tools/mock_env/ssh_mock_server.py"]
+    volumes:
+      - ./:/app:ro
+    ports:
+      - "8081:8081"
+    environment:
+      MOCK_SSH_PORT: "8081"
+      MOCK_SSH_DELAY_SECONDS: "0.05"
+
+  swut-mock:
+    image: python:3.11-slim
+    working_dir: /app
+    command: ["python", "tools/mock_env/swut_mock_server.py"]
+    volumes:
+      - ./:/app:ro
+    ports:
+      - "8082:8082"
+    environment:
+      MOCK_SWUT_PORT: "8082"
+      MOCK_SWUT_DELAY_SECONDS: "0.02"

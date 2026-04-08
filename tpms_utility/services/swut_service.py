@@ -8,6 +8,8 @@ import json
 import os
 from pathlib import Path
 from typing import Any, Callable
+import urllib.error
+import urllib.request
 
 try:
     from swut.library.diagnostic_library import DiagnosticLibrary
@@ -28,10 +30,11 @@ class SwutService:
     Expected cycle commands are mapped to explicit SWUT routines for HPA.
     """
 
-    def __init__(self, output_dir: Path) -> None:
+    def __init__(self, output_dir: Path, mock_url: str = "") -> None:
         self.output_dir = output_dir
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.audit_log = self.output_dir / "swut_audit.log"
+        self.mock_url = (mock_url or os.environ.get("TPMS_SWUT_MOCK_URL", "")).strip().rstrip("/")
         self.hpa_host = os.environ.get("SWUT_HPA_HOST", os.environ.get("TPMS_TARGET_HOST", "169.254.4.10"))
         os.environ.setdefault("SWUT_HPA_HOST", self.hpa_host)
         self.hpa_pin = os.environ.get(
@@ -176,6 +179,9 @@ class SwutService:
         if not normalized:
             return UdsCommandResult(command=command, success=False, details="Empty command")
 
+        if self.mock_url:
+            return self._run_mock_command(command=command, normalized_command=normalized)
+
         console_output = ""
         try:
             response, console_output = self._capture_console(lambda: self._execute_mapped_command(normalized))
@@ -194,3 +200,27 @@ class SwutService:
 
     def run_batch(self, commands: list[str]) -> list[UdsCommandResult]:
         return [self.run_uds_command(command) for command in commands]
+
+    def _run_mock_command(self, command: str, normalized_command: str) -> UdsCommandResult:
+        payload = {
+            "command": command,
+            "normalized_command": normalized_command,
+            "hpa_host": self.hpa_host,
+        }
+        request = urllib.request.Request(
+            url=f"{self.mock_url}/run",
+            data=json.dumps(payload).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=15) as response:  # noqa: S310 - local/mock endpoint
+                body = response.read().decode("utf-8", errors="ignore")
+            parsed = json.loads(body) if body else {}
+            success = bool(parsed.get("success", True))
+            details = str(parsed.get("details", "mock response"))
+            self._append_audit_log(command, "OK" if success else "ERROR")
+            return UdsCommandResult(command=command, success=success, details=details)
+        except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
+            self._append_audit_log(command, "ERROR")
+            return UdsCommandResult(command=command, success=False, details=f"mock SWUT request failed: {exc}")
