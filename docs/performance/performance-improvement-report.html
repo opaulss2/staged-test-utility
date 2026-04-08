@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TPMS Performance Improvement Report</title>
+  <link rel="stylesheet" href="performance-improvement-report.css" />
+</head>
+<body>
+  <main>
+    <h1>TPMS Performance Improvement Report</h1>
+    <p class="note">Generated 2026-04-08. Comparison target: master (31bff7f). Current branch: perf/remediation-1-2-swut-ui-log (898edc7).</p>
+
+    <section class="card">
+      <h2>Executive Summary</h2>
+      <div class="grid">
+        <div class="kpi">
+          <div class="label">Startup Avg (Before)</div>
+          <div class="value">819.302 ms</div>
+        </div>
+        <div class="kpi">
+          <div class="label">Startup Avg (After)</div>
+          <div class="value">206.320 ms</div>
+        </div>
+        <div class="kpi">
+          <div class="label">Average Improvement</div>
+          <div class="value">-74.82%</div>
+        </div>
+      </div>
+      <p class="note">Startup remediation impact is strong and consistent. P95 improved from 870.511 ms to 237.295 ms (-72.74%).</p>
+    </section>
+
+    <section class="card">
+      <h2>Before vs After Startup Timing</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Metric</th>
+              <th>Before</th>
+              <th>After</th>
+              <th>Delta</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>Average startup import latency</td>
+              <td>819.302 ms</td>
+              <td>206.320 ms</td>
+              <td>-612.982 ms (-74.82%)</td>
+            </tr>
+            <tr>
+              <td>P95 startup import latency</td>
+              <td>870.511 ms</td>
+              <td>237.295 ms</td>
+              <td>-633.216 ms (-72.74%)</td>
+            </tr>
+            <tr>
+              <td>Min startup import latency</td>
+              <td>779.966 ms</td>
+              <td>177.245 ms</td>
+              <td>-602.721 ms</td>
+            </tr>
+            <tr>
+              <td>Max startup import latency</td>
+              <td>886.435 ms</td>
+              <td>274.848 ms</td>
+              <td>-611.587 ms</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="card">
+      <h2>Latest Baseline Run Snapshot</h2>
+      <p class="note">Artifact: output/perf/stage_latency_with_startup_metric.json</p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Metric</th>
+              <th>Value</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr><td>Startup metric (5 samples) avg</td><td>214.371 ms</td></tr>
+            <tr><td>Startup metric p95</td><td>215.899 ms</td></tr>
+            <tr><td>Stage 0 avg latency</td><td>0.002 ms</td></tr>
+            <tr><td>Stage 1 avg latency</td><td>162.465 ms</td></tr>
+            <tr><td>Stage 3 avg latency</td><td>113.178 ms</td></tr>
+            <tr><td>Stage 4 avg latency</td><td>3.846 ms</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="card warning">
+      <h2>Comparison Notes</h2>
+      <p class="note">master does not currently include docs/performance/BASELINE.md. This report compares against pre-remediation startup measurements collected before lazy SWUT import and deferred startup self-check were introduced.</p>
+      <p class="note">Machine-readable details are available in performance-improvement-report.xml.</p>
+    </section>
+  </main>
+</body>
+</html>

@@ -19,7 +19,7 @@ Stages 5 and 6 are intentionally excluded from the initial baseline because they
 Command:
 
 ```powershell
-.\.venv\Scripts\python.exe tools\perf\run_stage_latency.py --iterations 10 --stages 0,1,3,4 --output output\perf\stage_latency.json
+.\.venv\Scripts\python.exe tools\perf\run_stage_latency.py --iterations 10 --stages 0,1,3,4 --startup-samples 5 --output output\perf\stage_latency.json
 ```
 
 Environment:
@@ -43,6 +43,10 @@ Artifacts:
 - `output/perf/stage_latency.json`
 - `output/perf/stage_latency_rerun.json`
 - `output/perf/mock_services.log`
+
+Startup baseline metric (captured in each stage latency artifact):
+- `startup_import_ms.avg_ms`
+- `startup_import_ms.p95_ms`
 
 ## Results
 
@@ -95,7 +99,7 @@ Suggested validation sequence:
 
 ```powershell
 docker compose -f docker-compose.mock.yml up -d
-.\.venv\Scripts\python.exe tools\perf\run_stage_latency.py --iterations 10 --stages 0,1,3,4 --output output\perf\stage_latency.json
+.\.venv\Scripts\python.exe tools\perf\run_stage_latency.py --iterations 10 --stages 0,1,3,4 --startup-samples 5 --output output\perf\stage_latency.json
 docker compose -f docker-compose.mock.yml logs > output\perf\mock_services.log
 docker compose -f docker-compose.mock.yml down -v --remove-orphans
 ```
