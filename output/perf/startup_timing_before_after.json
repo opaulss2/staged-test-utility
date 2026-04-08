@@ -1,0 +1,23 @@
+{
+  "metric": "cold_import_tpms_utility.ui.main_window_ms",
+  "before": {
+    "samples": 10,
+    "avg_ms": 819.302,
+    "min_ms": 779.966,
+    "max_ms": 886.435,
+    "p95_ms": 870.511
+  },
+  "after": {
+    "samples": 10,
+    "avg_ms": 206.32,
+    "min_ms": 177.245,
+    "max_ms": 274.848,
+    "p95_ms": 237.295
+  },
+  "delta": {
+    "avg_ms_change": -612.982,
+    "avg_percent_change": -74.82,
+    "p95_ms_change": -633.216,
+    "p95_percent_change": -72.74
+  }
+}
