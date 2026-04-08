@@ -62,7 +62,7 @@ class MainWindow:
 
         self._build_layout()
         self._refresh_stage_buttons()
-        self._run_startup_self_checks()
+        self.root.after(0, self._run_startup_self_checks)
         self._process_pending_timer_update()
 
         self.root.bind("<space>", self._on_space)

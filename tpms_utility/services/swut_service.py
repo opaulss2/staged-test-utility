@@ -3,6 +3,7 @@ from __future__ import annotations
 import contextlib
 from dataclasses import dataclass
 from datetime import datetime
+import importlib
 import io
 import json
 import os
@@ -10,11 +11,6 @@ from pathlib import Path
 from typing import Any, Callable
 import urllib.error
 import urllib.request
-
-try:
-    from swut.library.diagnostic_library import DiagnosticLibrary
-except ImportError:  # pragma: no cover - depends on private package installation
-    DiagnosticLibrary = None  # type: ignore[assignment]
 
 
 @dataclass(slots=True)
@@ -45,12 +41,29 @@ class SwutService:
         )
         self._diag_obj = None
         self._diag_obj_initialised = False
+        self._diagnostic_library_class: Any | None = None
+        self._diagnostic_library_resolved = False
+
+    def _resolve_diagnostic_library_class(self) -> Any | None:
+        if self._diagnostic_library_resolved:
+            return self._diagnostic_library_class
+
+        self._diagnostic_library_resolved = True
+        try:
+            module = importlib.import_module("swut.library.diagnostic_library")
+        except ImportError:  # pragma: no cover - depends on private package installation
+            self._diagnostic_library_class = None
+            return None
+
+        self._diagnostic_library_class = getattr(module, "DiagnosticLibrary", None)
+        return self._diagnostic_library_class
 
     def _get_diag_object(self):
         if not self._diag_obj_initialised:
             self._diag_obj_initialised = True
-            if DiagnosticLibrary is not None:
-                self._diag_obj = DiagnosticLibrary()
+            diagnostic_library_class = self._resolve_diagnostic_library_class()
+            if diagnostic_library_class is not None:
+                self._diag_obj = diagnostic_library_class()
         return self._diag_obj
 
     @staticmethod

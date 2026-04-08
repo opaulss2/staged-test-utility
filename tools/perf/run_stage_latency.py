@@ -4,6 +4,9 @@ import argparse
 from dataclasses import asdict
 import json
 from pathlib import Path
+import statistics
+import subprocess
+import sys
 import time
 
 from tpms_utility.config import AppSettings, DltConnectionSettings
@@ -52,6 +55,30 @@ def summarize(records: list[dict[int, float]], stage_ids: list[int]) -> dict[str
     return summary
 
 
+def measure_startup_import(samples: int) -> dict[str, float | int]:
+    runs_ms: list[float] = []
+    sample_count = max(samples, 1)
+    cmd = [
+        sys.executable,
+        "-c",
+        "import time; s=time.perf_counter(); import tpms_utility.ui.main_window; print((time.perf_counter()-s)*1000)",
+    ]
+
+    for _ in range(sample_count):
+        completed = subprocess.run(cmd, capture_output=True, text=True, check=True)
+        runs_ms.append(float(completed.stdout.strip()))
+
+    sorted_runs = sorted(runs_ms)
+    p95_index = max(int(len(sorted_runs) * 0.95) - 1, 0)
+    return {
+        "samples": sample_count,
+        "avg_ms": round(statistics.mean(runs_ms), 3),
+        "min_ms": round(min(runs_ms), 3),
+        "max_ms": round(max(runs_ms), 3),
+        "p95_ms": round(sorted_runs[p95_index], 3),
+    }
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description="Run stage-level latency timing against configured endpoints.")
     parser.add_argument("--iterations", type=int, default=5, help="Number of repeated runs.")
@@ -66,6 +93,12 @@ def main() -> None:
         type=Path,
         default=Path("output") / "perf" / "stage_latency.json",
         help="Output file path for metrics JSON.",
+    )
+    parser.add_argument(
+        "--startup-samples",
+        type=int,
+        default=5,
+        help="Number of cold startup import samples to include in output.",
     )
     args = parser.parse_args()
 
@@ -104,6 +137,7 @@ def main() -> None:
     output = {
         "iterations": args.iterations,
         "stages": selected_stages,
+        "startup_import_ms": measure_startup_import(args.startup_samples),
         "app_settings": asdict(app_settings),
         "dlt_settings": asdict(dlt_settings),
         "records_ms": records,
