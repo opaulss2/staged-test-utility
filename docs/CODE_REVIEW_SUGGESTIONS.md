@@ -1,5 +1,9 @@
 # Code Review Suggestions (No Code Changes Applied)
 
+Update 2026-04-08:
+- Suggestion 1 (SWUT audit append/rotation) is implemented.
+- Suggestion 2 (UI execution log retention cap) is implemented.
+
 Scope reviewed:
 - `main.py`
 - `tpms_utility/**/*.py`

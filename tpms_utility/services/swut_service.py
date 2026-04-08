@@ -34,6 +34,8 @@ class SwutService:
         self.output_dir = output_dir
         self.output_dir.mkdir(parents=True, exist_ok=True)
         self.audit_log = self.output_dir / "swut_audit.log"
+        self.audit_log_backup = self.output_dir / "swut_audit.log.1"
+        self.audit_log_max_bytes = int(os.environ.get("TPMS_SWUT_AUDIT_LOG_MAX_BYTES", str(5 * 1024 * 1024)))
         self.mock_url = (mock_url or os.environ.get("TPMS_SWUT_MOCK_URL", "")).strip().rstrip("/")
         self.hpa_host = os.environ.get("SWUT_HPA_HOST", os.environ.get("TPMS_TARGET_HOST", "169.254.4.10"))
         os.environ.setdefault("SWUT_HPA_HOST", self.hpa_host)
@@ -153,10 +155,23 @@ class SwutService:
     def _append_audit_log(self, command: str, result: str) -> None:
         timestamp = datetime.now().isoformat(timespec="seconds")
         line = f"{timestamp} | {result} | {command}\n"
-        self.audit_log.write_text(
-            self.audit_log.read_text(encoding="utf-8") + line if self.audit_log.exists() else line,
-            encoding="utf-8",
-        )
+        self._rotate_audit_log_if_needed(extra_bytes=len(line.encode("utf-8")))
+        with self.audit_log.open("a", encoding="utf-8") as handle:
+            handle.write(line)
+
+    def _rotate_audit_log_if_needed(self, extra_bytes: int) -> None:
+        if self.audit_log_max_bytes <= 0:
+            return
+        if not self.audit_log.exists():
+            return
+
+        current_size = self.audit_log.stat().st_size
+        if current_size + extra_bytes <= self.audit_log_max_bytes:
+            return
+
+        if self.audit_log_backup.exists():
+            self.audit_log_backup.unlink()
+        self.audit_log.replace(self.audit_log_backup)
 
     def startup_self_check(self) -> UdsCommandResult:
         command = "SELF_CHECK 22F186"
