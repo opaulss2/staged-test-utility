@@ -6,6 +6,8 @@
   --accent: #1f6f4a;
   --warn: #9a6f1a;
   --border: #d8ddd3;
+  --good: #1f6f4a;
+  --info-border: #2a6fa8;
 }
 
 * {
@@ -99,4 +101,43 @@ th {
 .warning {
   border-left: 4px solid var(--warn);
   padding-left: 10px;
+}
+
+.info {
+  border-left: 4px solid var(--info-border);
+}
+
+.kpi .value.good {
+  color: var(--good);
+}
+
+td.good {
+  color: var(--good);
+  font-weight: 600;
+}
+
+.badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 99px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  background: #eef2ec;
+  color: var(--muted);
+}
+
+.badge.noise {
+  background: #f1ede3;
+  color: #7a5f28;
+}
+
+ul.note {
+  margin: 0;
+  padding-left: 18px;
+}
+
+ul.note li {
+  margin-bottom: 6px;
 }
