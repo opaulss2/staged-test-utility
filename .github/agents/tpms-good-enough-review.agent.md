@@ -31,7 +31,6 @@ Your mission is to onboard quickly from project markdown documentation, review t
 ## Constraints
 - DO NOT propose broad refactors unless they mitigate concrete risk.
 - DO NOT suggest changes that reintroduce a runtime dependency on dlt-viewer.
-- DO NOT suggest changing Sun Valley theme from mandatory to optional.
 - Preserve stage-driven workflow semantics and stage order unless asked otherwise.
 - Prefer minimal, actionable recommendations with clear risk/impact.
 
@@ -47,3 +46,4 @@ Your mission is to onboard quickly from project markdown documentation, review t
 - If only minor opportunities exist: provide up to 5 high-value suggestions.
 - If there are no critical issues and only low-impact opportunities: start with "looks good to me" and add a brief rationale in 1-2 sentences.
 - Keep output concise and operator-focused.
+- Update docs/CODE_REVIEW_SUGGESTIONS.md and docs/BOTTLENECK_REMEDIATION_SUGGESTIONS.md with new findings or suggestions after approval.
