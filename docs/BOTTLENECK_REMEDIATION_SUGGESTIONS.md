@@ -2,6 +2,20 @@
 
 This document focuses on reducing criticality and operational risk, not only identifying issues.
 
+## Optimization baseline in repository
+
+Current optimization baseline is automated through `Jenkinsfile`.
+
+Baseline execution path:
+1. Start mocked endpoints with `docker-compose.mock.yml`.
+2. Run `tools/perf/run_stage_latency.py` against stages `0,1,3,4`.
+3. Persist metrics to `output/perf/stage_latency.json`.
+4. Archive benchmark output and mock service logs.
+
+Implication for remediation work:
+- Any performance change should be verified both locally and through the Jenkins optimization pipeline.
+- Changes to mock endpoint ports, benchmark arguments, or metrics paths must stay synchronized between `Jenkinsfile`, `README.md`, and implementation docs.
+
 ## 1) SWUT Audit Log Write Amplification
 
 Primary location:
@@ -161,6 +175,7 @@ Rationale:
 - Stage 3 SSH restart still fail-fast on errors.
 - Stage 5 timer and shortening logic unchanged.
 - Stage 6 export still blocked until timer completion.
+- Jenkins optimization pipeline run completes with archived `output/perf/stage_latency.json` artifact.
 
 ## Optional Observability Additions
 

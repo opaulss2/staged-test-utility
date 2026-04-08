@@ -79,3 +79,20 @@ Excluded from review scope:
 
 - Static diagnostics in workspace: no current errors reported.
 - This review made **no source-code behavior changes**.
+
+## CI Optimization Pipeline Follow-Ups
+
+1. **Keep optimization docs and pipeline in sync**
+- Files: `Jenkinsfile`, `README.md`, `docs/IMPLEMENTATION_NOTES.md`
+- Risk: stale run instructions cause false failures or local/CI drift.
+- Suggestion: when changing mock endpoints, benchmark CLI flags, or output paths, update all three files in one change.
+
+2. **Add explicit latency threshold gating when baseline is stable**
+- File: `Jenkinsfile`
+- Risk: regressions may pass unnoticed if pipeline only reports metrics.
+- Suggestion: after collecting a stable baseline, add stage-level thresholds and fail build when exceeded.
+
+3. **Version benchmark output schema changes**
+- File: `tools/perf/run_stage_latency.py`
+- Risk: downstream summary/parsing can break silently when JSON shape changes.
+- Suggestion: add a simple schema version field in metrics output and validate it in Jenkins summary step.

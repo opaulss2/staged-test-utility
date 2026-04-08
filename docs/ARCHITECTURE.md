@@ -16,6 +16,40 @@ flowchart LR
     EX --> OUT2["Tawm+LIB ASCII"]
 ```
 
+## Optimization pipeline architecture
+
+```mermaid
+flowchart LR
+    JN["Jenkinsfile"] --> PF["Preflight\npython3 + docker compose"]
+    PF --> INST["Install\npython -m pip install -e . --no-deps"]
+    INST --> COMP["Compile\npython -m compileall tpms_utility tools"]
+    COMP --> MK["Mock Stack\ndocker-compose.mock.yml"]
+    MK --> DLTM["DLT Mock\ntools/mock_env/dlt_mock_server.py"]
+    MK --> SSHM["SSH Mock\ntools/mock_env/ssh_mock_server.py"]
+    MK --> SWUTM["SWUT Mock\ntools/mock_env/swut_mock_server.py"]
+    MK --> BENCH["Benchmark\ntools/perf/run_stage_latency.py"]
+    BENCH --> ART["Artifacts\noutput/perf/stage_latency.json\noutput/perf/mock_services.log"]
+    ART --> CLEAN["Cleanup\ndocker compose down"]
+```
+
+## Optimization pipeline sequence
+
+```mermaid
+sequenceDiagram
+    participant Jenkins
+    participant DockerCompose
+    participant MockServices
+    participant Benchmark
+
+    Jenkins->>DockerCompose: up -d (docker-compose.mock.yml)
+    DockerCompose->>MockServices: start DLT/SSH/SWUT mocks
+    Jenkins->>Benchmark: run_stage_latency.py --iterations N --stages 0,1,3,4
+    Benchmark->>MockServices: call SWUT and SSH HTTP mocks, connect DLT TCP mock
+    Benchmark->>Jenkins: write output/perf/stage_latency.json
+    Jenkins->>DockerCompose: collect logs and down -v --remove-orphans
+    Jenkins->>Jenkins: archive output/perf artifacts
+```
+
 ## Stage execution sequence (0-6)
 
 ```mermaid
@@ -66,3 +100,6 @@ sequenceDiagram
 - Embedded DLT viewer integration: `tpms_utility/services/dlt_service.py`
 - Stage behavior customization: `tpms_utility/stages/default_cycle.py`
 - UI design changes (layout/visual flow): `tpms_utility/ui/main_window.py`
+- CI optimization entrypoint: `Jenkinsfile`
+- Mock service behavior and fault/latency injection: `tools/mock_env/*.py`
+- Stage latency benchmark behavior and output schema: `tools/perf/run_stage_latency.py`

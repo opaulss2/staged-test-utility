@@ -36,7 +36,7 @@
   - Default trace: `Off`
   - Verbose mode enabled
 - Applies logging profile id for Tawm contexts.
-- Starts temp logging file `<timestamp>_dlt-viewer-tmpfile.dlt`.
+- Starts temp logging file `<timestamp>_dlt_tmpfile.dlt`.
 
 ### Stage 5: Clear log and start test
 - Deletes/clears temp DLT file.
@@ -64,9 +64,46 @@
 - test duration and shortened duration
 - output paths and naming templates
 - DLT default connection settings
+- optional DLT port override (`TPMS_DLT_PORT`)
+- optional optimization mock endpoints (`TPMS_SWUT_MOCK_URL`, `TPMS_SSH_MOCK_URL`)
+
+## Optimization pipeline (Jenkins)
+
+Pipeline entrypoint:
+- `Jenkinsfile`
+
+Pipeline purpose:
+- execute deterministic stage-level latency checks in a containerized mock environment and archive output/perf artifacts.
+
+Pipeline flow:
+1. Checkout.
+2. Verify tooling (`python3`, `docker`, `docker compose`).
+3. Install project with `python3 -m pip install -e . --no-deps`.
+4. Compile check with `python3 -m compileall tpms_utility tools`.
+5. Start mock stack with `docker compose -f docker-compose.mock.yml up -d`.
+6. Run benchmark with `python3 tools/perf/run_stage_latency.py --iterations <N> --stages 0,1,3,4 --output output/perf/stage_latency.json`.
+7. Summarize metrics from JSON.
+8. Always collect compose logs and tear down containers.
+
+Mock components used by pipeline:
+- `tools/mock_env/dlt_mock_server.py`
+- `tools/mock_env/ssh_mock_server.py`
+- `tools/mock_env/swut_mock_server.py`
+
+Generated optimization artifacts:
+- `output/perf/stage_latency.json`
+- `output/perf/mock_services.log`
+
+Default optimization environment values in pipeline:
+- `TPMS_DLT_HOST=127.0.0.1`
+- `TPMS_DLT_PORT=3491`
+- `TPMS_SWUT_MOCK_URL=http://127.0.0.1:8082`
+- `TPMS_SSH_MOCK_URL=http://127.0.0.1:8081`
+- `TPMS_TEST_DURATION_SECONDS=5`
+- `TPMS_SHORTENED_DURATION_SECONDS=2`
 
 ## Known prototype constraints for your design decision
 
 - DLT integration is currently a local simulation adapter, not embedded native DLT viewer.
-- SWUT adapter is currently dry-run logging due to custom repository/API-key install constraints.
+- SWUT adapter supports both real SWUT runtime behavior and optional mock endpoint mode for optimization tests.
 - Stage sequencing behavior currently auto-wraps from stage 6 to stage 0 on next advance.
