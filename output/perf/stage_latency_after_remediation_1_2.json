@@ -1,0 +1,165 @@
+{
+  "iterations": 10,
+  "stages": [
+    0,
+    1,
+    3,
+    4
+  ],
+  "app_settings": {
+    "output_root": "C:\\Users\\OPAULSS2\\AppData\\Local\\dTPMSTestUtility",
+    "enable_swut_startup_self_check": false,
+    "ssh_timeout_seconds": 15,
+    "ssh_mock_url": "http://127.0.0.1:8081",
+    "sga_host": "169.254.4.10",
+    "sga_user": "swupdate",
+    "sga_password": "swupdate",
+    "vcu_host": "198.19.0.1",
+    "vcu_user": "root",
+    "vcu_password": "root",
+    "tawm_restart_command": "/opt/csp/bin/em_control --restart tyre_and_wheel_monitor",
+    "temp_log_template": "{timestamp}_dlt_tmpfile.dlt",
+    "swut_mock_url": "http://127.0.0.1:8082",
+    "final_log_template": "{timestamp}_test.dlt",
+    "tawm_export_template": "{timestamp}_Tawm_filtered.dlt",
+    "tawm_lib_export_template": "{timestamp}_Tawm_LIB_ascii.txt",
+    "test_duration_seconds": 5,
+    "shortened_duration_seconds": 2,
+    "fault_tokens": "{'fault id: 30 debounce status: 1', 'fault id: 32 debounce status: 1', 'fault id: 31 debounce status: 1', 'fault id: 33 debounce status: 1'}"
+  },
+  "dlt_settings": {
+    "ecu_id": "TPMS",
+    "hostname": "127.0.0.1",
+    "port": 3491,
+    "auto_reconnect_timeout_seconds": 5,
+    "default_log_level": "Info",
+    "default_trace_status": "Off",
+    "verbose_mode": "Verbose Mode",
+    "write_dltv2_storage_header": false,
+    "timing_packets_from_ecu": false,
+    "send_get_log_info_if_online": true,
+    "send_get_sw_version_if_online": true,
+    "send_default_levels_if_online": true,
+    "logging_profile_id": "Tawm:{DRM:{LogLevel: verbose},LCM:{LogLevel: verbose},LIB:{LogLevel: verbose},EVNT:{LogLevel: verbose},FSHA:{LogLevel: verbose},SERV:{LogLevel: verbose},Tawm:{LogLevel: verbose}}"
+  },
+  "records_ms": [
+    {
+      "0": 0.001,
+      "1": 237.014,
+      "3": 126.568,
+      "4": 17.297
+    },
+    {
+      "0": 0.001,
+      "1": 156.493,
+      "3": 134.423,
+      "4": 30.217
+    },
+    {
+      "0": 0.001,
+      "1": 124.022,
+      "3": 105.228,
+      "4": 16.943
+    },
+    {
+      "0": 0.001,
+      "1": 146.15,
+      "3": 142.174,
+      "4": 4.33
+    },
+    {
+      "0": 0.002,
+      "1": 132.587,
+      "3": 126.73,
+      "4": 3.651
+    },
+    {
+      "0": 0.002,
+      "1": 116.788,
+      "3": 136.357,
+      "4": 27.19
+    },
+    {
+      "0": 0.002,
+      "1": 137.452,
+      "3": 116.458,
+      "4": 13.644
+    },
+    {
+      "0": 0.001,
+      "1": 121.243,
+      "3": 127.489,
+      "4": 4.307
+    },
+    {
+      "0": 0.002,
+      "1": 132.426,
+      "3": 104.205,
+      "4": 4.115
+    },
+    {
+      "0": 0.002,
+      "1": 183.675,
+      "3": 122.029,
+      "4": 8.846
+    }
+  ],
+  "summary_ms": {
+    "0": {
+      "count": 10.0,
+      "min_ms": 0.001,
+      "max_ms": 0.002,
+      "avg_ms": 0.002
+    },
+    "1": {
+      "count": 10.0,
+      "min_ms": 116.788,
+      "max_ms": 237.014,
+      "avg_ms": 148.785
+    },
+    "3": {
+      "count": 10.0,
+      "min_ms": 104.205,
+      "max_ms": 142.174,
+      "avg_ms": 124.166
+    },
+    "4": {
+      "count": 10.0,
+      "min_ms": 3.651,
+      "max_ms": 30.217,
+      "avg_ms": 13.054
+    }
+  },
+  "log_tail": [
+    "\u2705 SWUT test PASS: 1D12 2717 -> simulated SWUT success for 2717",
+    "\u2705 SWUT test PASS: 1D12 2705 -> simulated SWUT success for 2705",
+    "\u2705 SWUT test PASS: 1D12 2E20EB20000001200000022000000320000004 -> simulated SWUT success for 2E20EB20000001200000022000000320000004",
+    "Restarting Tawm in HPA via SSH hop (SGA -> VCU)",
+    "Tawm restart command completed via SSH mock endpoint",
+    "\u2705 SWUT test PASS: 1D12 2705 -> simulated SWUT success for 2705",
+    "\u2705 SWUT test PASS: 1D12 3101DF04 -> simulated SWUT success for 3101DF04",
+    "DLT logging started: 127.0.0.1:3491, tmp file C:\\Users\\OPAULSS2\\AppData\\Local\\dTPMSTestUtility\\20260408_141642_dlt_tmpfile.dlt",
+    "Cycle reset to stage 0",
+    "Stage 0 init: ready for test cycle",
+    "\u2705 SWUT test PASS: 1D12 1003 -> simulated SWUT success for 1003",
+    "\u2705 SWUT test PASS: 1D12 2717 -> simulated SWUT success for 2717",
+    "\u2705 SWUT test PASS: 1D12 2705 -> simulated SWUT success for 2705",
+    "\u2705 SWUT test PASS: 1D12 2E20EB20000001200000022000000320000004 -> simulated SWUT success for 2E20EB20000001200000022000000320000004",
+    "Restarting Tawm in HPA via SSH hop (SGA -> VCU)",
+    "Tawm restart command completed via SSH mock endpoint",
+    "\u2705 SWUT test PASS: 1D12 2705 -> simulated SWUT success for 2705",
+    "\u2705 SWUT test PASS: 1D12 3101DF04 -> simulated SWUT success for 3101DF04",
+    "DLT logging started: 127.0.0.1:3491, tmp file C:\\Users\\OPAULSS2\\AppData\\Local\\dTPMSTestUtility\\20260408_141642_dlt_tmpfile.dlt",
+    "Cycle reset to stage 0",
+    "Stage 0 init: ready for test cycle",
+    "\u2705 SWUT test PASS: 1D12 1003 -> simulated SWUT success for 1003",
+    "\u2705 SWUT test PASS: 1D12 2717 -> simulated SWUT success for 2717",
+    "\u2705 SWUT test PASS: 1D12 2705 -> simulated SWUT success for 2705",
+    "\u2705 SWUT test PASS: 1D12 2E20EB20000001200000022000000320000004 -> simulated SWUT success for 2E20EB20000001200000022000000320000004",
+    "Restarting Tawm in HPA via SSH hop (SGA -> VCU)",
+    "Tawm restart command completed via SSH mock endpoint",
+    "\u2705 SWUT test PASS: 1D12 2705 -> simulated SWUT success for 2705",
+    "\u2705 SWUT test PASS: 1D12 3101DF04 -> simulated SWUT success for 3101DF04",
+    "DLT logging started: 127.0.0.1:3491, tmp file C:\\Users\\OPAULSS2\\AppData\\Local\\dTPMSTestUtility\\20260408_141642_dlt_tmpfile.dlt"
+  ]
+}
