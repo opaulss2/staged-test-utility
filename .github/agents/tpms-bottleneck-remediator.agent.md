@@ -85,12 +85,11 @@ The baseline-first policy is mandatory:
 ## Output Format
 Return a compact execution report with:
 1. Baseline summary: benchmark command, iterations, stages, and key latency numbers (avg and p95).
-2. Remediation attempted: what changed and why.
+2. Remediation suggested: what should be changed and why.
 3. Validation summary: compile checks, benchmark rerun, and any behavioral smoke checks.
 4. Comparison summary: remediation branch versus main baseline with percent deltas.
-5. Decision: kept or discarded, with performance evidence.
-6. Git result: baseline refresh commit/push decision (5% rule), remediation branch name, and proposed commit message.
-7. Documentation updates made, especially in *_SUGGESTIONS.md files and docs/performance/BASELINE.md when refreshed.
+5. Git result: baseline refresh commit/push decision (5% rule), remediation branch name, and proposed commit message.
+6. Documentation updates made, especially in *_SUGGESTIONS.md files and docs/performance/BASELINE.md when refreshed.
 
 ## Decision Rules
 - Favor measured improvements over theoretical ones.

@@ -1,0 +1,44 @@
+[
+  {
+    "stage_id": 0,
+    "name": "Init",
+    "script_name": "stage0_init.py",
+    "action": "init"
+  },
+  {
+    "stage_id": 1,
+    "name": "Overwrite WUIDs",
+    "script_name": "stage1_overwrite_wuids.py",
+    "action": "overwrite_wuids"
+  },
+  {
+    "stage_id": 2,
+    "name": "Manual: Set wheel sensors stationary",
+    "script_name": "(manual)",
+    "action": null
+  },
+  {
+    "stage_id": 3,
+    "name": "Enter dTPMS debug",
+    "script_name": "stage3_enter_debug.py",
+    "action": "enter_debug"
+  },
+  {
+    "stage_id": 4,
+    "name": "Start logging",
+    "script_name": "stage4_start_logging.py",
+    "action": "start_logging"
+  },
+  {
+    "stage_id": 5,
+    "name": "Clear log and start test",
+    "script_name": "stage5_clear_start_test.py",
+    "action": "clear_start_test"
+  },
+  {
+    "stage_id": 6,
+    "name": "Filter and export",
+    "script_name": "stage6_filter_export.py",
+    "action": "filter_export"
+  }
+]

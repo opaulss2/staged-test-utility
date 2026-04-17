@@ -1,41 +1,47 @@
 from __future__ import annotations
 
+import json
+from pathlib import Path
+
 from tpms_utility.cycle_controller import CycleController
 from tpms_utility.models import Stage
 
 
 def build_default_cycle(controller: CycleController) -> list[Stage]:
-    return [
-        Stage(stage_id=0, name="Init", script_name="stage0_init", action=controller.stage0_init),
-        Stage(
-            stage_id=1,
-            name="Overwrite WUIDs",
-            script_name="stage1_overwrite_wuids.py",
-            action=controller.stage1_overwrite_wuids,
-        ),
-        Stage(stage_id=2, name="Manual: Set wheel sensors stationary", script_name="(manual)", action=None),
-        Stage(
-            stage_id=3,
-            name="Enter dTPMS debug",
-            script_name="stage3_enter_debug.py",
-            action=controller.stage3_enter_debug,
-        ),
-        Stage(
-            stage_id=4,
-            name="Start logging",
-            script_name="stage4_start_logging.py",
-            action=controller.stage4_start_logging,
-        ),
-        Stage(
-            stage_id=5,
-            name="Clear log and start test",
-            script_name="stage5_clear_start_test.py",
-            action=controller.stage5_clear_start_test,
-        ),
-        Stage(
-            stage_id=6,
-            name="Filter and export",
-            script_name="stage6_filter_export.py",
-            action=controller.stage6_filter_export,
-        ),
-    ]
+    cycle_path = Path(__file__).with_name("default_cycle.json")
+    stage_definitions = _read_stage_definitions(cycle_path)
+
+    stages: list[Stage] = []
+    for item in stage_definitions:
+        stage_id = item.get("stage_id")
+        name = item.get("name")
+        script_name = item.get("script_name")
+        action_name = item.get("action")
+
+        if not isinstance(stage_id, int):
+            raise ValueError(f"Invalid stage_id in {cycle_path}: {stage_id!r}")
+        if not isinstance(name, str) or not name.strip():
+            raise ValueError(f"Invalid name for stage {stage_id} in {cycle_path}")
+        if not isinstance(script_name, str) or not script_name.strip():
+            raise ValueError(f"Invalid script_name for stage {stage_id} in {cycle_path}")
+        if action_name is not None and not isinstance(action_name, str):
+            raise ValueError(f"Invalid action for stage {stage_id} in {cycle_path}: {action_name!r}")
+
+        stages.append(
+            Stage(
+                stage_id=stage_id,
+                name=name,
+                script_name=script_name,
+                action=controller.resolve_stage_action(action_name),
+            )
+        )
+
+    return stages
+
+
+def _read_stage_definitions(path: Path) -> list[dict]:
+    raw = path.read_text(encoding="utf-8")
+    data = json.loads(raw)
+    if not isinstance(data, list):
+        raise ValueError(f"Cycle definition at {path} must be a JSON array")
+    return data

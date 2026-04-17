@@ -44,9 +44,28 @@ class CycleController:
 
         self._timer_thread: threading.Thread | None = None
         self._timer_stop_event = threading.Event()
+        self._state_lock = threading.Lock()
         self._fault_tokens_seen: set[str] = set()
         self._total_duration_seconds = self.app_settings.test_duration_seconds
         self._finished = False
+
+    def resolve_stage_action(self, action_name: str | None) -> Callable[[CycleRuntime], None] | None:
+        if action_name is None:
+            return None
+
+        action_map: dict[str, Callable[[CycleRuntime], None]] = {
+            "init": self.action_init,
+            "overwrite_wuids": self.action_overwrite_wuids,
+            "enter_debug": self.action_enter_debug,
+            "start_logging": self.action_start_logging,
+            "clear_start_test": self.action_clear_start_test,
+            "filter_export": self.action_filter_export,
+        }
+        try:
+            return action_map[action_name]
+        except KeyError as exc:
+            known_actions = ", ".join(sorted(action_map))
+            raise ValueError(f"Unknown stage action '{action_name}'. Known actions: {known_actions}") from exc
 
     @property
     def current_stage(self) -> Stage:
@@ -54,15 +73,18 @@ class CycleController:
 
     @property
     def is_test_finished(self) -> bool:
-        return self._finished
+        with self._state_lock:
+            return self._finished
 
     def reset_cycle(self) -> None:
         self.current_index = 0
         self.runtime = None
-        self._fault_tokens_seen.clear()
-        self._total_duration_seconds = self.app_settings.test_duration_seconds
-        self._finished = False
         self._timer_stop_event.set()
+        self.dlt.disconnect()
+        with self._state_lock:
+            self._fault_tokens_seen.clear()
+            self._total_duration_seconds = self.app_settings.test_duration_seconds
+            self._finished = False
         self.dlt.clear_payload_callbacks()
         self.on_timer_changed(0)
         self.on_state_changed()
@@ -100,10 +122,10 @@ class CycleController:
             )
         return self.runtime
 
-    def stage0_init(self, _: CycleRuntime) -> None:
+    def action_init(self, _: CycleRuntime) -> None:
         self.on_log("Stage 0 init: ready for test cycle")
 
-    def stage1_overwrite_wuids(self, _: CycleRuntime) -> None:
+    def action_overwrite_wuids(self, _: CycleRuntime) -> None:
         commands = [
             "1D12 1003",
             "1D12 2717",
@@ -117,7 +139,7 @@ class CycleController:
             self.on_log("❌ Stage 1 halted: SWUT test failure detected; stage will not advance")
             raise RuntimeError(f"Stage 1 failed: {failures[0].command} -> {failures[0].details}")
 
-    def stage3_enter_debug(self, _: CycleRuntime) -> None:
+    def action_enter_debug(self, _: CycleRuntime) -> None:
         self._restart_tawm_in_hpa()
         commands = ["1D12 2705", "1D12 3101DF04"]
         results = self.swut.run_batch(commands)
@@ -253,7 +275,8 @@ class CycleController:
         finally:
             sga.close()
 
-    def stage4_start_logging(self, runtime: CycleRuntime) -> None:
+    def action_start_logging(self, runtime: CycleRuntime) -> None:
+        self.dlt.disconnect()
         self.dlt.connect(self.dlt_settings)
         self.dlt.set_logging_profile(self.dlt_settings.logging_profile_id)
         self.dlt.start_logging(runtime.temp_log_path)
@@ -263,19 +286,24 @@ class CycleController:
             f"tmp file {runtime.temp_log_path}"
         )
 
-    def stage5_clear_start_test(self, runtime: CycleRuntime) -> None:
+    def action_clear_start_test(self, runtime: CycleRuntime) -> None:
         self.dlt.clear_tmp_log()
         self.on_log(f"Temporary log cleared: {runtime.temp_log_path}")
         self.audio.beep_once()
-        self._fault_tokens_seen.clear()
-        self._total_duration_seconds = self.app_settings.test_duration_seconds
+        with self._state_lock:
+            self._fault_tokens_seen.clear()
+            self._total_duration_seconds = self.app_settings.test_duration_seconds
         self.dlt.clear_payload_callbacks()
         self.dlt.register_payload_callback(self._on_payload)
         self._start_timer(runtime)
-        self.on_log(f"Test timer started: {self._total_duration_seconds} seconds")
+        with self._state_lock:
+            total_duration = self._total_duration_seconds
+        self.on_log(f"Test timer started: {total_duration} seconds")
 
-    def stage6_filter_export(self, runtime: CycleRuntime) -> None:
-        if not self._finished:
+    def action_filter_export(self, runtime: CycleRuntime) -> None:
+        with self._state_lock:
+            finished = self._finished
+        if not finished:
             raise RuntimeError("Cannot export yet. Stage 5 timer is still running.")
         tawm_dlt_path = runtime.final_log_path.parent / self.app_settings.tawm_export_template.format(
             timestamp=runtime.run_timestamp
@@ -289,17 +317,33 @@ class CycleController:
         self.on_log(f"Exported ASCII filter file: {tawm_lib_ascii_path}")
 
     def _on_payload(self, payload: str) -> None:
-        self.on_log(f"DLT payload: {payload}")
-        if payload in self.app_settings.fault_tokens:
-            self._fault_tokens_seen.add(payload)
-        if len(self._fault_tokens_seen) == len(self.app_settings.fault_tokens):
-            self._total_duration_seconds = min(
-                self._total_duration_seconds,
-                self.app_settings.shortened_duration_seconds,
-            )
+        if self.app_settings.log_all_dlt_payloads:
+            self.on_log(f"DLT payload: {payload}")
+
+        matched_tokens = [token for token in self.app_settings.fault_tokens if token in payload]
+        if not matched_tokens:
+            return
+
+        should_log_reduction = False
+        with self._state_lock:
+            for token in matched_tokens:
+                if token not in self._fault_tokens_seen:
+                    self._fault_tokens_seen.add(token)
+                    self.on_log(f"DLT fault token matched: {token}")
+
+            if len(self._fault_tokens_seen) == len(self.app_settings.fault_tokens):
+                new_duration = min(
+                    self._total_duration_seconds,
+                    self.app_settings.shortened_duration_seconds,
+                )
+                should_log_reduction = new_duration != self._total_duration_seconds
+                self._total_duration_seconds = new_duration
+                current_duration = self._total_duration_seconds
+
+        if should_log_reduction:
             self.on_log(
                 "All four debounce fault payloads found. "
-                f"Timer reduced to {self._total_duration_seconds} seconds."
+                f"Timer reduced to {current_duration} seconds."
             )
 
     def _start_timer(self, runtime: CycleRuntime) -> None:
@@ -317,9 +361,11 @@ class CycleController:
     def _run_timer(self, runtime: CycleRuntime) -> None:
         elapsed = 0
         while not self._timer_stop_event.is_set():
-            if elapsed >= self._total_duration_seconds:
+            with self._state_lock:
+                total_duration = self._total_duration_seconds
+            if elapsed >= total_duration:
                 break
-            remaining = max(self._total_duration_seconds - elapsed, 0)
+            remaining = max(total_duration - elapsed, 0)
             self.on_timer_changed(remaining)
             self._timer_stop_event.wait(timeout=1.0)
             elapsed += 1
@@ -331,7 +377,8 @@ class CycleController:
         self.audio.beep_three_times()
         self.dlt.save_log_to(runtime.final_log_path)
         self.dlt.disconnect()
-        self._finished = True
+        with self._state_lock:
+            self._finished = True
         self.on_log(f"Test completed. Final log saved: {runtime.final_log_path}")
 
     def stop(self) -> None:

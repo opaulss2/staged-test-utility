@@ -28,6 +28,13 @@ def _target_host_default() -> str:
     return os.environ.get("TPMS_TARGET_HOST", "169.254.4.10")
 
 
+def _env_bool(name: str, default: bool) -> bool:
+    raw = os.environ.get(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
 @dataclass(slots=True)
 class DltConnectionSettings:
     ecu_id: str = "TPMS"
@@ -73,6 +80,7 @@ class AppSettings:
     tawm_lib_export_template: str = "{timestamp}_Tawm_LIB_ascii.txt"
     test_duration_seconds: int = int(os.environ.get("TPMS_TEST_DURATION_SECONDS", str(10 * 60)))
     shortened_duration_seconds: int = int(os.environ.get("TPMS_SHORTENED_DURATION_SECONDS", str(2 * 60)))
+    log_all_dlt_payloads: bool = _env_bool("TPMS_LOG_ALL_DLT_PAYLOADS", False)
     fault_tokens: set[str] = field(
         default_factory=lambda: {
             "fault id: 30 debounce status: 1",

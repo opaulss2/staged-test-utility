@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from pathlib import Path
+import queue
 import textwrap
 import tkinter as tk
 from tkinter import messagebox, ttk
@@ -46,7 +47,7 @@ class MainWindow:
         self.timer_wheel_angle = 0
         self.timer_wheel_job: str | None = None
         self.timer_running = False
-        self.pending_timer_seconds: int | None = 0
+        self._ui_event_queue: queue.SimpleQueue[tuple[str, object]] = queue.SimpleQueue()
         self._log_line_count = 0
         self._log_append_count = 0
 
@@ -54,16 +55,16 @@ class MainWindow:
             stages=[],
             app_settings=DEFAULT_APP_SETTINGS,
             dlt_settings=DEFAULT_DLT_SETTINGS,
-            on_state_changed=self._refresh_stage_buttons,
-            on_log=self._append_log,
-            on_timer_changed=self._set_timer,
+            on_state_changed=self._queue_state_refresh,
+            on_log=self._queue_log,
+            on_timer_changed=self._queue_timer,
         )
         self.controller.stages = build_default_cycle(self.controller)
 
         self._build_layout()
         self._refresh_stage_buttons()
         self.root.after(0, self._run_startup_self_checks)
-        self._process_pending_timer_update()
+        self._process_ui_events()
 
         self.root.bind("<space>", self._on_space)
         self.root.protocol("WM_DELETE_WINDOW", self._on_close)
@@ -247,14 +248,38 @@ class MainWindow:
         wrapped_name = textwrap.fill(stage_name, width=16)
         return f"Stage {stage_id}\n{wrapped_name}"
 
-    def _set_timer(self, remaining_seconds: int) -> None:
-        self.pending_timer_seconds = remaining_seconds
+    def _queue_state_refresh(self) -> None:
+        self._ui_event_queue.put(("state", None))
 
-    def _process_pending_timer_update(self) -> None:
-        if self.pending_timer_seconds is not None:
-            self._apply_timer_update(self.pending_timer_seconds)
-            self.pending_timer_seconds = None
-        self.root.after(100, self._process_pending_timer_update)
+    def _queue_log(self, message: str) -> None:
+        self._ui_event_queue.put(("log", message))
+
+    def _queue_timer(self, remaining_seconds: int) -> None:
+        self._ui_event_queue.put(("timer", remaining_seconds))
+
+    def _process_ui_events(self) -> None:
+        latest_timer: int | None = None
+        should_refresh_state = False
+
+        while True:
+            try:
+                event_type, payload = self._ui_event_queue.get_nowait()
+            except queue.Empty:
+                break
+
+            if event_type == "log" and isinstance(payload, str):
+                self._append_log(payload)
+            elif event_type == "state":
+                should_refresh_state = True
+            elif event_type == "timer" and isinstance(payload, int):
+                latest_timer = payload
+
+        if should_refresh_state:
+            self._refresh_stage_buttons()
+        if latest_timer is not None:
+            self._apply_timer_update(latest_timer)
+
+        self.root.after(100, self._process_ui_events)
 
     def _apply_timer_update(self, remaining_seconds: int) -> None:
         minutes, seconds = divmod(remaining_seconds, 60)

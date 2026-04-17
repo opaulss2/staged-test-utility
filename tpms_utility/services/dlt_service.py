@@ -51,6 +51,9 @@ class DltService:
         self._tmp_file_lock = threading.Lock()
 
     def connect(self, settings: DltConnectionSettings) -> None:
+        if self._socket is not None or (self._receive_thread and self._receive_thread.is_alive()):
+            self.disconnect()
+
         self.settings = settings
         self._stop_event.clear()
         self._parser = DltStreamParser()
@@ -75,14 +78,16 @@ class DltService:
         self.online = False
         sock = self._socket
         self._socket = None
+        receive_thread = self._receive_thread
+        self._receive_thread = None
         if sock:
             try:
                 sock.shutdown(socket.SHUT_RDWR)
             except OSError:
                 pass
             sock.close()
-        if self._receive_thread and self._receive_thread.is_alive():
-            self._receive_thread.join(timeout=2)
+        if receive_thread and receive_thread.is_alive() and receive_thread is not threading.current_thread():
+            receive_thread.join(timeout=2)
 
     def set_logging_profile(self, profile_id: str) -> None:
         self._profile_levels = self._parse_profile(profile_id)
