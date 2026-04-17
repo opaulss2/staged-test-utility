@@ -9,6 +9,7 @@ from tkinter import messagebox, ttk
 from tpms_utility.config import DEFAULT_APP_SETTINGS, DEFAULT_DLT_SETTINGS
 from tpms_utility.cycle_controller import CycleController
 from tpms_utility.stages.default_cycle import build_default_cycle
+from tpms_utility.stages.profiles import discover_profiles, load_profile
 
 _BORDER_SELECTED = "#F78923"  # orange  – current stage, ready to execute
 _BORDER_UPCOMING = "#F7F323"  # yellow  – future stages
@@ -38,10 +39,12 @@ class MainWindow:
         self.timer_var = tk.StringVar(value="Remaining: 00:00")
         self.current_stage_var = tk.StringVar(value="Current stage: 0")
         self.timer_stage_var = tk.StringVar(value="Timed stage idle")
+        self.profile_var = tk.StringVar(value="")
 
         self.log_text: tk.Text | None = None
         self.stage_buttons: dict[int, ttk.Button] = {}
         self.stage_frames: dict[int, tk.Frame] = {}
+        self.stage_frame_widget: ttk.LabelFrame | None = None
         self.timer_canvas: tk.Canvas | None = None
         self.timer_wheel_arc: int | None = None
         self.timer_wheel_angle = 0
@@ -50,6 +53,10 @@ class MainWindow:
         self._ui_event_queue: queue.SimpleQueue[tuple[str, object]] = queue.SimpleQueue()
         self._log_line_count = 0
         self._log_append_count = 0
+        
+        # Discover and store available profiles
+        self.profiles: list[tuple[str, Path]] = discover_profiles()
+        self.profiles_by_name: dict[str, Path] = {name: path for name, path in self.profiles}
 
         self.controller = CycleController(
             stages=[],
@@ -60,6 +67,8 @@ class MainWindow:
             on_timer_changed=self._queue_timer,
         )
         self.controller.stages = build_default_cycle(self.controller)
+
+        self.profile_var.set(self._select_initial_profile_name())
 
         self._build_layout()
         self._refresh_stage_buttons()
@@ -86,31 +95,7 @@ class MainWindow:
         self.root.rowconfigure(0, weight=2)
         self.root.rowconfigure(1, weight=1)
 
-        max_stage = max((stage.stage_id for stage in self.controller.stages), default=0)
-        stage_frame = ttk.LabelFrame(
-            self.root,
-            text=f"Stages 0-{max_stage}",
-            width=_STAGE_FRAME_WIDTH,
-            height=_STAGE_FRAME_HEIGHT,
-        )
-        stage_frame.grid(row=0, column=0, sticky="nsew", padx=12, pady=12)
-        stage_frame.grid_propagate(False)
-        stage_frame.rowconfigure(0, weight=1)
-
-        _btn_outer = 115 + 2 * _BORDER_WIDTH
-        for idx in range(len(self.controller.stages)):
-            stage_frame.columnconfigure(idx, weight=1, uniform="stage")
-            stage = self.controller.stages[idx]
-            label = self._format_stage_label(stage.stage_id, stage.name)
-            border = tk.Frame(stage_frame, bg=_BORDER_UPCOMING, width=_btn_outer, height=_btn_outer)
-            border.grid(row=0, column=idx, padx=8, pady=8)
-            border.grid_propagate(False)
-            border.rowconfigure(0, weight=1)
-            border.columnconfigure(0, weight=1)
-            button = ttk.Button(border, text=label, command=lambda i=idx: self._select_stage(i))
-            button.grid(row=0, column=0, sticky="nsew", padx=_BORDER_WIDTH, pady=_BORDER_WIDTH)
-            self.stage_frames[idx] = border
-            self.stage_buttons[idx] = button
+        self._rebuild_stage_frame()
 
         details_frame = ttk.LabelFrame(
             self.root,
@@ -122,14 +107,29 @@ class MainWindow:
         details_frame.grid_propagate(False)
         details_frame.columnconfigure(0, weight=1)
 
+        # Profile selection at top of status panel
+        lbl_profile = ttk.Label(details_frame, text="Profile:")
+        lbl_profile.grid(row=0, column=0, sticky="w", padx=8, pady=(8, 2))
+        
+        profile_names = [name for name, _ in self.profiles]
+        profile_combo = ttk.Combobox(
+            details_frame,
+            textvariable=self.profile_var,
+            values=profile_names,
+            state="readonly",
+            width=35,
+        )
+        profile_combo.grid(row=1, column=0, sticky="ew", padx=8, pady=(0, 8))
+        profile_combo.bind("<<ComboboxSelected>>", self._on_profile_selected)
+
         lbl_stage = ttk.Label(details_frame, textvariable=self.current_stage_var, wraplength=_DETAILS_WRAP, justify="left")
-        lbl_stage.grid(row=0, column=0, sticky="ew", padx=8, pady=(8, 4))
+        lbl_stage.grid(row=2, column=0, sticky="ew", padx=8, pady=(8, 4))
         lbl_status = ttk.Label(details_frame, textvariable=self.status_var, wraplength=_DETAILS_WRAP, justify="left")
-        lbl_status.grid(row=1, column=0, sticky="ew", padx=8, pady=4)
+        lbl_status.grid(row=3, column=0, sticky="ew", padx=8, pady=4)
         lbl_timer = ttk.Label(details_frame, textvariable=self.timer_var, wraplength=_DETAILS_WRAP, justify="left")
-        lbl_timer.grid(row=2, column=0, sticky="ew", padx=8, pady=(4, 8))
+        lbl_timer.grid(row=4, column=0, sticky="ew", padx=8, pady=(4, 8))
         lbl_timer_stage = ttk.Label(details_frame, textvariable=self.timer_stage_var, wraplength=_DETAILS_WRAP, justify="left")
-        lbl_timer_stage.grid(row=3, column=0, sticky="ew", padx=8, pady=(0, 8))
+        lbl_timer_stage.grid(row=5, column=0, sticky="ew", padx=8, pady=(0, 8))
 
         self.timer_canvas = tk.Canvas(
             details_frame,
@@ -139,7 +139,7 @@ class MainWindow:
             bd=0,
             background=self.root.cget("bg"),
         )
-        self.timer_canvas.grid(row=4, column=0, pady=(0, 12))
+        self.timer_canvas.grid(row=6, column=0, pady=(0, 12))
         self.timer_canvas.grid_remove()
         inset = _WHEEL_ARC_WIDTH
         self.timer_canvas.create_oval(
@@ -168,7 +168,7 @@ class MainWindow:
             "Stage 6 will fail if stage 5 timer has not finished."
         )
         lbl_instructions = ttk.Label(details_frame, text=instructions, justify="left", wraplength=_DETAILS_WRAP)
-        lbl_instructions.grid(row=5, column=0, sticky="nw", padx=8, pady=4)
+        lbl_instructions.grid(row=7, column=0, sticky="nw", padx=8, pady=4)
 
         log_frame = ttk.LabelFrame(self.root, text="Execution log", height=_LOG_FRAME_HEIGHT)
         log_frame.grid(row=1, column=0, columnspan=2, sticky="nsew", padx=12, pady=(0, 12))
@@ -178,6 +178,38 @@ class MainWindow:
         self.log_text = tk.Text(log_frame, height=14, state="disabled")
         self.log_text.grid(row=0, column=0, sticky="nsew", padx=8, pady=8)
 
+    def _rebuild_stage_frame(self) -> None:
+        """Rebuild the stage button frame when profile changes."""
+        if self.stage_frame_widget is not None:
+            self.stage_frame_widget.destroy()
+
+        max_stage = max((stage.stage_id for stage in self.controller.stages), default=0)
+        stage_frame = ttk.LabelFrame(
+            self.root,
+            text=f"Stages 0-{max_stage}",
+            width=_STAGE_FRAME_WIDTH,
+            height=_STAGE_FRAME_HEIGHT,
+        )
+        stage_frame.grid(row=0, column=0, sticky="nsew", padx=12, pady=12)
+        stage_frame.grid_propagate(False)
+        stage_frame.rowconfigure(0, weight=1)
+        self.stage_frame_widget = stage_frame
+
+        _btn_outer = 115 + 2 * _BORDER_WIDTH
+        for idx in range(len(self.controller.stages)):
+            stage_frame.columnconfigure(idx, weight=1, uniform="stage")
+            stage = self.controller.stages[idx]
+            label = self._format_stage_label(stage.stage_id, stage.name)
+            border = tk.Frame(stage_frame, bg=_BORDER_UPCOMING, width=_btn_outer, height=_btn_outer)
+            border.grid(row=0, column=idx, padx=8, pady=8)
+            border.grid_propagate(False)
+            border.rowconfigure(0, weight=1)
+            border.columnconfigure(0, weight=1)
+            button = ttk.Button(border, text=label, command=lambda i=idx: self._select_stage(i))
+            button.grid(row=0, column=0, sticky="nsew", padx=_BORDER_WIDTH, pady=_BORDER_WIDTH)
+            self.stage_frames[idx] = border
+            self.stage_buttons[idx] = button
+
     def _on_space(self, _: tk.Event) -> None:
         try:
             self.controller.advance_by_space()
@@ -185,6 +217,42 @@ class MainWindow:
         except Exception as exc:  # noqa: BLE001
             self.status_var.set("Execution failed")
             messagebox.showerror("Stage execution error", str(exc))
+
+    def _on_profile_selected(self, _: tk.Event) -> None:
+        """Handle profile selection from dropdown."""
+        try:
+            profile_name = self.profile_var.get()
+            if not profile_name or profile_name not in self.profiles_by_name:
+                return
+            
+            profile_path = self.profiles_by_name[profile_name]
+            new_stages = load_profile(self.controller, profile_path)
+            
+            # Reset cycle with new profile
+            self.controller.reset_cycle()
+            self.controller.stages = new_stages
+
+            # Clear old stage buttons and frames
+            self.stage_buttons.clear()
+            self.stage_frames.clear()
+            
+            # Rebuild stage frame with new profile
+            self._rebuild_stage_frame()
+            self._refresh_stage_buttons()
+            
+            self._append_log(f"Profile changed to: {profile_name}")
+            self.status_var.set("Profile loaded")
+        except Exception as exc:  # noqa: BLE001
+            self.status_var.set(f"Profile load failed: {exc}")
+            messagebox.showerror("Profile load error", str(exc))
+            self.profile_var.set(self._select_initial_profile_name())
+
+    def _select_initial_profile_name(self) -> str:
+        if "default_cycle" in self.profiles_by_name:
+            return "default_cycle"
+        if self.profiles:
+            return self.profiles[0][0]
+        return ""
 
     def _run_startup_self_checks(self) -> None:
         if not self.controller.app_settings.enable_swut_startup_self_check:

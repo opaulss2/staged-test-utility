@@ -161,6 +161,63 @@ If a stage fails, progression is halted on that stage. Press Space again to re-r
 
 5. Wait for stage 5 timer to complete before stage 6 export.
 
+## Profile Selection
+
+The application supports dynamic profile switching without restart. Profiles are test cycle definitions (JSON files) that allow you to run different sequences of stages.
+
+### Using Profiles
+
+A profile selector dropdown is located at the top of the **Status** panel. Select a different profile to:
+
+1. Reset the current cycle
+2. Load new stages from the selected profile
+3. Rebuild stage buttons dynamically
+4. Log the profile change to the execution log
+
+### Managing Profiles
+
+Profiles are JSON files in `tpms_utility/stages/`:
+
+- File format: `*.json` (e.g., `default_cycle.json`, `example_minimal_cycle.json`)
+- All profiles are discovered and sorted alphabetically on startup
+- No application restart required after adding a new profile
+
+### Creating a Custom Profile
+
+1. Create a `.json` file in `tpms_utility/stages/` directory (e.g., `my_cycle.json`)
+2. Define stages using the structure below:
+
+```json
+[
+  {
+    "stage_id": 0,
+    "name": "Stage Name",
+    "script_name": "script_name.py",
+    "action": "action_name"
+  },
+  {
+    "stage_id": 1,
+    "name": "Next Stage",
+    "script_name": "script.py",
+    "action": "overwrite_wuids"
+  }
+]
+```
+
+3. Supported actions: `init`, `overwrite_wuids`, `enter_debug`, `start_logging`, `clear_start_test`, `filter_export`
+4. Save the file and restart the application. Your profile will appear in the dropdown.
+
+### Included Profiles
+
+- **default_cycle**: Full 7-stage TPMS test cycle
+- **example_minimal_cycle**: Simplified 4-stage demonstration cycle
+
+### Error Handling
+
+- Invalid profile selections fall back to the first available profile
+- Detailed error messages appear in dialog boxes
+- Failed profile loads do not interrupt the application
+
 ## Output artifacts
 
 Output root:

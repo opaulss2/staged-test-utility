@@ -58,6 +58,45 @@ class MainWindowEventQueueTests(unittest.TestCase):
         window._apply_timer_update.assert_not_called()
         window.root.after.assert_called_once_with(100, window._process_ui_events)
 
+    def test_select_initial_profile_name_prefers_default_cycle(self) -> None:
+        window = MainWindow.__new__(MainWindow)
+        window.profiles = [
+            ("alpha", Mock()),
+            ("default_cycle", Mock()),
+        ]
+        window.profiles_by_name = {
+            "alpha": Mock(),
+            "default_cycle": Mock(),
+        }
+
+        selected = window._select_initial_profile_name()
+
+        self.assertEqual(selected, "default_cycle")
+
+    def test_select_initial_profile_name_falls_back_to_first_profile(self) -> None:
+        window = MainWindow.__new__(MainWindow)
+        window.profiles = [
+            ("alpha", Mock()),
+            ("beta", Mock()),
+        ]
+        window.profiles_by_name = {
+            "alpha": Mock(),
+            "beta": Mock(),
+        }
+
+        selected = window._select_initial_profile_name()
+
+        self.assertEqual(selected, "alpha")
+
+    def test_select_initial_profile_name_returns_empty_when_no_profiles(self) -> None:
+        window = MainWindow.__new__(MainWindow)
+        window.profiles = []
+        window.profiles_by_name = {}
+
+        selected = window._select_initial_profile_name()
+
+        self.assertEqual(selected, "")
+
 
 if __name__ == "__main__":
     unittest.main()

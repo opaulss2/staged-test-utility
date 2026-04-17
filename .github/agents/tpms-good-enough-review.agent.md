@@ -24,7 +24,6 @@ Your mission is to onboard from project markdown and core runtime files, review 
 8. Read docs/IMPLEMENTATION_NOTES.md.
 9. Read docs/CODE_REVIEW_SUGGESTIONS.md.
 10. Read docs/performance/BASELINE.md.
-11. If present, read docs/BOTTLENECK_REMEDIATION_SUGGESTIONS.md.
 
 ## Review And Performance Scope
 - Always review core first-party code:

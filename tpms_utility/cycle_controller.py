@@ -11,11 +11,13 @@ import urllib.request
 import json
 
 from tpms_utility.config import AppSettings, DltConnectionSettings
+from tpms_utility.dlt_actions import DltActions
 from tpms_utility.models import CycleRuntime, Stage
 from tpms_utility.services.audio_service import AudioService
 from tpms_utility.services.dlt_service import DltService
 from tpms_utility.services.log_exporter import LogExporter
 from tpms_utility.services.swut_service import SwutService
+from tpms_utility.swut_actions import SwutActions
 
 
 class CycleController:
@@ -41,6 +43,8 @@ class CycleController:
         self.dlt = DltService()
         self.audio = AudioService()
         self.exporter = LogExporter()
+        self.dlt_actions = DltActions(self)
+        self.swut_actions = SwutActions(self)
 
         self._timer_thread: threading.Thread | None = None
         self._timer_stop_event = threading.Event()
@@ -125,29 +129,11 @@ class CycleController:
     def action_init(self, _: CycleRuntime) -> None:
         self.on_log("Stage 0 init: ready for test cycle")
 
-    def action_overwrite_wuids(self, _: CycleRuntime) -> None:
-        commands = [
-            "1D12 1003",
-            "1D12 2717",
-            "1D12 2705",
-            "1D12 2E20EB20000001200000022000000320000004",
-        ]
-        results = self.swut.run_batch(commands)
-        self._log_swut_test_results(results)
-        failures = [result for result in results if not result.success]
-        if failures:
-            self.on_log("❌ Stage 1 halted: SWUT test failure detected; stage will not advance")
-            raise RuntimeError(f"Stage 1 failed: {failures[0].command} -> {failures[0].details}")
+    def action_overwrite_wuids(self, runtime: CycleRuntime) -> None:
+        self.swut_actions.action_overwrite_wuids(runtime)
 
-    def action_enter_debug(self, _: CycleRuntime) -> None:
-        self._restart_tawm_in_hpa()
-        commands = ["1D12 2705", "1D12 3101DF04"]
-        results = self.swut.run_batch(commands)
-        self._log_swut_test_results(results)
-        failures = [result for result in results if not result.success]
-        if failures:
-            self.on_log("❌ Stage 3 halted: SWUT test failure detected; stage will not advance")
-            raise RuntimeError(f"Stage 3 failed: {failures[0].command} -> {failures[0].details}")
+    def action_enter_debug(self, runtime: CycleRuntime) -> None:
+        self.swut_actions.action_enter_debug(runtime)
 
     def _log_swut_test_results(self, results: list) -> None:
         for result in results:
@@ -276,45 +262,13 @@ class CycleController:
             sga.close()
 
     def action_start_logging(self, runtime: CycleRuntime) -> None:
-        self.dlt.disconnect()
-        self.dlt.connect(self.dlt_settings)
-        self.dlt.set_logging_profile(self.dlt_settings.logging_profile_id)
-        self.dlt.start_logging(runtime.temp_log_path)
-        self.on_log(
-            "DLT logging started: "
-            f"{self.dlt_settings.hostname}:{self.dlt_settings.port}, "
-            f"tmp file {runtime.temp_log_path}"
-        )
+        self.dlt_actions.action_start_logging(runtime)
 
     def action_clear_start_test(self, runtime: CycleRuntime) -> None:
-        self.dlt.clear_tmp_log()
-        self.on_log(f"Temporary log cleared: {runtime.temp_log_path}")
-        self.audio.beep_once()
-        with self._state_lock:
-            self._fault_tokens_seen.clear()
-            self._total_duration_seconds = self.app_settings.test_duration_seconds
-        self.dlt.clear_payload_callbacks()
-        self.dlt.register_payload_callback(self._on_payload)
-        self._start_timer(runtime)
-        with self._state_lock:
-            total_duration = self._total_duration_seconds
-        self.on_log(f"Test timer started: {total_duration} seconds")
+        self.dlt_actions.action_clear_start_test(runtime)
 
     def action_filter_export(self, runtime: CycleRuntime) -> None:
-        with self._state_lock:
-            finished = self._finished
-        if not finished:
-            raise RuntimeError("Cannot export yet. Stage 5 timer is still running.")
-        tawm_dlt_path = runtime.final_log_path.parent / self.app_settings.tawm_export_template.format(
-            timestamp=runtime.run_timestamp
-        )
-        tawm_lib_ascii_path = runtime.final_log_path.parent / self.app_settings.tawm_lib_export_template.format(
-            timestamp=runtime.run_timestamp
-        )
-        self.exporter.export_filtered_dlt(runtime.final_log_path, tawm_dlt_path, app_id="Tawm")
-        self.exporter.export_filtered_ascii(runtime.final_log_path, tawm_lib_ascii_path, app_id="Tawm", ctx_id="LIB")
-        self.on_log(f"Exported DLT filter file: {tawm_dlt_path}")
-        self.on_log(f"Exported ASCII filter file: {tawm_lib_ascii_path}")
+        self.dlt_actions.action_filter_export(runtime)
 
     def _on_payload(self, payload: str) -> None:
         if self.app_settings.log_all_dlt_payloads:

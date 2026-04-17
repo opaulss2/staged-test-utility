@@ -1,0 +1,26 @@
+[
+  {
+    "stage_id": 0,
+    "name": "Init",
+    "script_name": "stage0_init.py",
+    "action": "init"
+  },
+  {
+    "stage_id": 1,
+    "name": "Quick SWUT Test",
+    "script_name": "stage1_quick_swut.py",
+    "action": "overwrite_wuids"
+  },
+  {
+    "stage_id": 2,
+    "name": "DLT Logging",
+    "script_name": "stage2_logging.py",
+    "action": "start_logging"
+  },
+  {
+    "stage_id": 3,
+    "name": "Test & Export",
+    "script_name": "stage3_test_export.py",
+    "action": "filter_export"
+  }
+]
