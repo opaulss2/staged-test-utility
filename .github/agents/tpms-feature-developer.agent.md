@@ -1,6 +1,6 @@
 ---
-name: Expert Python Feature Developer
-description: "Use when implementing new Python features with minimal, safe changes and strong validation. Keywords: expert python developer, new feature, feature implementation, python refactor, add functionality, production-ready python."
+name: TPMS Feature Developer
+description: "Use when implementing new TPMS features with minimal, safe changes and strong validation. Keywords: feature implementation, new feature, python refactor, add functionality, production-ready python, TPMS utility."
 tools: [read, search, edit, execute, todo]
 user-invocable: true
 argument-hint: "Describe the feature, target files or modules, constraints, and acceptance criteria."
