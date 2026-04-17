@@ -22,7 +22,7 @@ Updated: 2026-04-17
 
 ## Findings
 
-- No open findings. All previously listed findings were implemented.
+- No open findings. The previously logged documentation drifts in [docs/IMPLEMENTATION_NOTES.md](docs/IMPLEMENTATION_NOTES.md) were corrected.
 
 ## Assumptions
 
@@ -31,5 +31,8 @@ Updated: 2026-04-17
 
 ## Validation Snapshot
 
-- Diagnostics reported no current static errors in the workspace pass.
-- Review focused on runtime behavior, stage-flow reliability, and benchmark pipeline consistency.
+- Diagnostics: no static errors reported by workspace diagnostics.
+- Compile check: passed via `python -m compileall tpms_utility tools`.
+- Unit tests: passed via `python -m unittest discover -s tests -p "test_*.py"` (12 tests).
+- Pytest was not available in the active venv (`No module named pytest`), so validation used the unittest suite.
+- Review focus remained on stage-flow reliability, SWUT/SSH fail-fast behavior, DLT export gating, and optimization pipeline consistency.

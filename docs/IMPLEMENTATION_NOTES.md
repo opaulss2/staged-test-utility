@@ -3,7 +3,7 @@
 ## Runtime behavior
 
 - Current cycle contains configured stages 0 through 6.
-- UI renders stages 0 through 9; 7-9 are shown as not configured placeholders.
+- UI renders stage buttons for configured stages only (0 through 6 in the default cycle).
 - Spacebar triggers the current stage action (if any) and advances to next stage.
 - Stage 6 requires stage 5 timer completion; otherwise it raises an execution error.
 
@@ -50,7 +50,7 @@
 - When all four are observed, timer is reduced to 2 minutes.
 - At timeout:
   - emits three beeps
-  - saves final log to `C:/Users/dTPMSTestUtility/<timestamp>_test.dlt`
+  - saves final log under `%LOCALAPPDATA%/dTPMSTestUtility` using `<timestamp>_test.dlt`
   - closes DLT connection
   - keeps saved log available for stage 6 processing
 
